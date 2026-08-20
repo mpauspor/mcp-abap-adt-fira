@@ -5,15 +5,39 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { isInclude } from '../../../lib/adt/includeSource';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
   isCloudConnection,
+  makeAdtRequestWithTimeout,
   return_error,
   return_response,
   safeCheckOperation,
 } from '../../../lib/utils';
+import { verifySourceWritten } from '../../../lib/verifyWrite';
+
+/** Read a program's source back, to substantiate the success claim. */
+async function readProgramSource(
+  connection: any,
+  programName: string,
+): Promise<string> {
+  const response = await makeAdtRequestWithTimeout(
+    connection,
+    `/sap/bc/adt/programs/programs/${encodeSapObjectName(
+      programName,
+    ).toLowerCase()}/source/main`,
+    'GET',
+    'default',
+    undefined,
+    undefined,
+    { Accept: 'text/plain' },
+  );
+  return typeof response.data === 'string'
+    ? response.data
+    : String(response.data);
+}
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
@@ -81,6 +105,18 @@ export async function handleUpdateProgram(
   logger?.info(
     `Starting program source update: ${programName} (activate=${args.activate === true})`,
   );
+
+  // An include addressed through the program resource is the failure this
+  // guard exists for: SAP answers lock, PUT and unlock without complaint and
+  // the include is left untouched. Refuse rather than report a write that did
+  // not happen.
+  if (await isInclude(connection, programName)) {
+    return return_error(
+      new Error(
+        `${programName} is an include (PROG/I), not a program. UpdateProgram writes to /sap/bc/adt/programs/programs/, which is the wrong ADT resource for an include and would silently fail to write. Use UpdateInclude instead.`,
+      ),
+    );
+  }
 
   // Connection setup
   try {
@@ -175,6 +211,24 @@ export async function handleUpdateProgram(
       }
     }
 
+    // Confirm the source actually landed on this object before reporting
+    // success. Without this, a write that SAP accepts but does not apply is
+    // indistinguishable from one that worked.
+    const verification = await verifySourceWritten(
+      () => readProgramSource(connection, programName),
+      args.source_code,
+      `Program ${programName}`,
+      logger,
+    );
+
+    if (!verification.verified) {
+      return return_error(
+        new Error(
+          `Program ${programName} update could not be confirmed: ${verification.reason}`,
+        ),
+      );
+    }
+
     // Check inactive version (after unlock, only when activating)
     if (shouldActivate) {
       logger?.debug(`Checking inactive version: ${programName}`);
@@ -254,11 +308,13 @@ export async function handleUpdateProgram(
         ? `Program ${programName} source updated and activated successfully`
         : `Program ${programName} source updated successfully (not activated)`,
       uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
+      write_verified: true,
       steps_completed: [
         'lock',
         'check_new_code',
         'update',
         'unlock',
+        'verify_read_back',
         'check_inactive',
         ...(shouldActivate ? ['activate'] : []),
       ],

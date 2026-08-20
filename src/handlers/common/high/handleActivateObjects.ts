@@ -31,7 +31,17 @@ export const TOOL_DEFINITION = {
             type: {
               type: 'string',
               description:
-                'Object type code: DOMA (domain), DTEL (data element), TABL (table), STRU (structure), DDLS (CDS view), CLAS (class), INTF (interface), PROG (program), FUGR (function group), FUGR/FF (function module), TTYP (table type), SRVD (service definition), SRVB (service binding), BDEF (behavior definition), DDLX (metadata extension), DCLS (access control), ENHO (enhancement)',
+                'Object type code: DOMA (domain), DTEL (data element), TABL (table), STRU (structure), DDLS (CDS view), CLAS (class), INTF (interface), PROG (program), PROG/I (include), FUGR (function group), FUGR/FF (function module), TTYP (table type), SRVD (service definition), SRVB (service binding), BDEF (behavior definition), DDLX (metadata extension), DCLS (access control), ENHO (enhancement). Use PROG/I for includes — activating an include as PROG fails with "REPORT/PROGRAM statement is missing".',
+            },
+            uri: {
+              type: 'string',
+              description:
+                'Optional explicit ADT URI, for object types not covered by the type map.',
+            },
+            parent_name: {
+              type: 'string',
+              description:
+                'Parent object name. Required for function modules (FUGR/FF), where it is the function group.',
             },
           },
           required: ['name', 'type'],

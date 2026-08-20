@@ -1,4 +1,17 @@
 // Per-type activate handlers (reused from low-level)
+
+import {
+  TOOL_DEFINITION as AbapGitLink_Tool,
+  handleAbapGitLink,
+} from '../../../handlers/abapgit/high/handleAbapGitLink';
+import {
+  TOOL_DEFINITION as AbapGitPull_Tool,
+  handleAbapGitPull,
+} from '../../../handlers/abapgit/high/handleAbapGitPull';
+import {
+  TOOL_DEFINITION as AbapGitUnlink_Tool,
+  handleAbapGitUnlink,
+} from '../../../handlers/abapgit/high/handleAbapGitUnlink';
 import {
   TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
   handleCheckBehaviorDefinition,
@@ -181,6 +194,18 @@ import {
   handleActivateMetadataExtension,
 } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 import {
+  TOOL_DEFINITION as DebuggerListen_Tool,
+  handleDebuggerListen,
+} from '../../../handlers/debugger/high/handleDebuggerListen';
+import {
+  TOOL_DEFINITION as DebuggerStep_Tool,
+  handleDebuggerStep,
+} from '../../../handlers/debugger/high/handleDebuggerStep';
+import {
+  TOOL_DEFINITION as DebuggerStop_Tool,
+  handleDebuggerStop,
+} from '../../../handlers/debugger/high/handleDebuggerStop';
+import {
   TOOL_DEFINITION as CheckDomain_Tool,
   handleCheckDomain,
 } from '../../../handlers/domain/high/handleCheckDomain';
@@ -264,6 +289,10 @@ import {
   TOOL_DEFINITION as GetFunctionModule_Tool,
   handleGetFunctionModule,
 } from '../../../handlers/function_module/high/handleGetFunctionModule';
+import {
+  handleUpdateInclude,
+  TOOL_DEFINITION as UpdateInclude_Tool,
+} from '../../../handlers/include/high/handleUpdateInclude';
 import {
   TOOL_DEFINITION as CheckInterface_Tool,
   handleCheckInterface,
@@ -467,6 +496,10 @@ import {
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
 import {
+  handleReleaseTransport,
+  TOOL_DEFINITION as ReleaseTransport_Tool,
+} from '../../../handlers/transport/high/handleReleaseTransport';
+import {
   TOOL_DEFINITION as CreateCdsUnitTest_Tool,
   handleCreateCdsUnitTest,
 } from '../../../handlers/unit_test/high/handleCreateCdsUnitTest';
@@ -522,6 +555,7 @@ import {
   isMutatingToolName,
   withCriticalSection,
 } from '../../criticalSection.js';
+import { withWriteVerification } from '../../writeVerification.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -1032,6 +1066,41 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleDeleteFunctionInclude),
       },
       {
+        toolDefinition: UpdateInclude_Tool,
+        handler: withContext(handleUpdateInclude),
+      },
+      // Transport lifecycle beyond create/read/list
+      {
+        toolDefinition: ReleaseTransport_Tool,
+        handler: withContext(handleReleaseTransport),
+      },
+      // abapGit (ADT-integrated)
+      {
+        toolDefinition: AbapGitLink_Tool,
+        handler: withContext(handleAbapGitLink),
+      },
+      {
+        toolDefinition: AbapGitPull_Tool,
+        handler: withContext(handleAbapGitPull),
+      },
+      {
+        toolDefinition: AbapGitUnlink_Tool,
+        handler: withContext(handleAbapGitUnlink),
+      },
+      // ABAP debugger
+      {
+        toolDefinition: DebuggerListen_Tool,
+        handler: withContext(handleDebuggerListen),
+      },
+      {
+        toolDefinition: DebuggerStep_Tool,
+        handler: withContext(handleDebuggerStep),
+      },
+      {
+        toolDefinition: DebuggerStop_Tool,
+        handler: withContext(handleDebuggerStop),
+      },
+      {
         toolDefinition: CreateBdef_Tool,
         handler: withContext(handleCreateBehaviorDefinition),
       },
@@ -1146,7 +1215,19 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     // section so a slow request is not aborted mid-flight, which would drop the
     // stateful session and orphan the lock (leaving the object locked/inactive).
     // No-op on connections older than @mcp-abap-adt/connection 1.10.0.
-    return entries.map((entry) =>
+    // Source-carrying Update* tools additionally read the object back and
+    // compare, so `success` reports a write that happened rather than one that
+    // merely did not throw. No-op for tools absent from SOURCE_WRITE_TOOLS.
+    const verified = entries.map((entry) => ({
+      ...entry,
+      handler: withWriteVerification(
+        entry.toolDefinition.name,
+        entry.handler,
+        () => this.context,
+      ),
+    }));
+
+    return verified.map((entry) =>
       isMutatingToolName(entry.toolDefinition.name)
         ? {
             ...entry,

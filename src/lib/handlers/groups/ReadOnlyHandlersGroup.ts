@@ -1,4 +1,16 @@
 import {
+  TOOL_DEFINITION as AbapGitGetErrorLog_Tool,
+  handleAbapGitGetErrorLog,
+} from '../../../handlers/abapgit/readonly/handleAbapGitGetErrorLog';
+import {
+  TOOL_DEFINITION as AbapGitGetRepo_Tool,
+  handleAbapGitGetRepo,
+} from '../../../handlers/abapgit/readonly/handleAbapGitGetRepo';
+import {
+  TOOL_DEFINITION as AbapGitListRepos_Tool,
+  handleAbapGitListRepos,
+} from '../../../handlers/abapgit/readonly/handleAbapGitListRepos';
+import {
   handleReadBehaviorDefinition,
   TOOL_DEFINITION as ReadBehaviorDefinition_Tool,
 } from '../../../handlers/behavior_definition/readonly/handleReadBehaviorDefinition';
@@ -30,6 +42,14 @@ import {
   handleReadDdl,
   TOOL_DEFINITION as ReadDdl_Tool,
 } from '../../../handlers/ddl/readonly/handleReadDdl';
+import {
+  TOOL_DEFINITION as DebuggerGetStack_Tool,
+  handleDebuggerGetStack,
+} from '../../../handlers/debugger/readonly/handleDebuggerGetStack';
+import {
+  TOOL_DEFINITION as DebuggerGetVariable_Tool,
+  handleDebuggerGetVariable,
+} from '../../../handlers/debugger/readonly/handleDebuggerGetVariable';
 import {
   handleReadDomain,
   TOOL_DEFINITION as ReadDomain_Tool,
@@ -90,6 +110,18 @@ import {
   handleReadMetadataExtension,
   TOOL_DEFINITION as ReadMetadataExtension_Tool,
 } from '../../../handlers/metadata_extension/readonly/handleReadMetadataExtension';
+import {
+  TOOL_DEFINITION as CompareObjectAcrossSystems_Tool,
+  handleCompareObjectAcrossSystems,
+} from '../../../handlers/multisystem/readonly/handleCompareObjectAcrossSystems';
+import {
+  TOOL_DEFINITION as ComparePackageAcrossSystems_Tool,
+  handleComparePackageAcrossSystems,
+} from '../../../handlers/multisystem/readonly/handleComparePackageAcrossSystems';
+import {
+  handleListSystems,
+  TOOL_DEFINITION as ListSystems_Tool,
+} from '../../../handlers/multisystem/readonly/handleListSystems';
 import {
   TOOL_DEFINITION as GetPackageContents_Tool,
   handleGetPackageContents,
@@ -189,6 +221,41 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetInclude_Tool,
         handler: (args: any) => handleGetInclude(this.context, args),
+      },
+      {
+        toolDefinition: AbapGitListRepos_Tool,
+        handler: (args: any) => handleAbapGitListRepos(this.context, args),
+      },
+      // Cross-system comparison
+      {
+        toolDefinition: ListSystems_Tool,
+        handler: (args: any) => handleListSystems(this.context, args),
+      },
+      {
+        toolDefinition: CompareObjectAcrossSystems_Tool,
+        handler: (args: any) =>
+          handleCompareObjectAcrossSystems(this.context, args),
+      },
+      {
+        toolDefinition: ComparePackageAcrossSystems_Tool,
+        handler: (args: any) =>
+          handleComparePackageAcrossSystems(this.context, args),
+      },
+      {
+        toolDefinition: AbapGitGetRepo_Tool,
+        handler: (args: any) => handleAbapGitGetRepo(this.context, args),
+      },
+      {
+        toolDefinition: AbapGitGetErrorLog_Tool,
+        handler: (args: any) => handleAbapGitGetErrorLog(this.context, args),
+      },
+      {
+        toolDefinition: DebuggerGetStack_Tool,
+        handler: (args: any) => handleDebuggerGetStack(this.context, args),
+      },
+      {
+        toolDefinition: DebuggerGetVariable_Tool,
+        handler: (args: any) => handleDebuggerGetVariable(this.context, args),
       },
       {
         toolDefinition: GetIncludesList_Tool,

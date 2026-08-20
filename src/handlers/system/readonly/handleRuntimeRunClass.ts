@@ -1,6 +1,79 @@
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import {
+  encodeSapObjectName,
+  makeAdtRequestWithTimeout,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
+
+/**
+ * SAP's answer when the runtime load does not expose if_oo_adt_classrun~main.
+ * Matches the message rather than a status code, because the endpoint returns
+ * 200 and puts the failure in the body.
+ */
+const STALE_LOAD_PATTERN = /does not implement if_oo_adt_classrun~main/i;
+
+async function readClassSource(
+  connection: IAbapConnection,
+  className: string,
+  version: 'active' | 'inactive',
+): Promise<string | undefined> {
+  try {
+    const response = await makeAdtRequestWithTimeout(
+      connection,
+      `/sap/bc/adt/oo/classes/${encodeSapObjectName(
+        className,
+      ).toLowerCase()}/source/main?version=${version}`,
+      'GET',
+      'default',
+      undefined,
+      undefined,
+      { Accept: 'text/plain' },
+    );
+    return typeof response.data === 'string' ? response.data : undefined;
+  } catch {
+    // Having no inactive version is the normal case, and a failed probe must
+    // never block the run the caller actually asked for.
+    return undefined;
+  }
+}
+
+/**
+ * Detect a class whose source has been changed but not activated.
+ *
+ * SAP executes the ACTIVE load. After an update-without-activate, running the
+ * class silently returns the previous version's output — or fails with
+ * "does not implement if_oo_adt_classrun~main" when it is the interface itself
+ * that was added in the unactivated version. Both look like the tool caching
+ * results, which sends the caller looking for a cache that does not exist.
+ * Naming the real cause is worth one extra request.
+ */
+async function findStaleActiveVersion(
+  connection: IAbapConnection,
+  className: string,
+  logger?: ILogger,
+): Promise<string | undefined> {
+  const [active, inactive] = await Promise.all([
+    readClassSource(connection, className, 'active'),
+    readClassSource(connection, className, 'inactive'),
+  ]);
+
+  if (inactive === undefined) return undefined;
+
+  if (active === undefined) {
+    logger?.warn(`${className} has an inactive version but no active version`);
+    return `Class ${className} has no active version — only an inactive one. Activate it before running.`;
+  }
+
+  if (active.replace(/\r\n/g, '\n') !== inactive.replace(/\r\n/g, '\n')) {
+    logger?.warn(`${className} has unactivated changes; active load is stale`);
+    return `Class ${className} has unactivated changes. SAP runs the ACTIVE version, so this execution would return output from the previous version. Activate the class (ActivateObjects with type CLAS/OC) and run again.`;
+  }
+
+  return undefined;
+}
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunClass',
@@ -18,6 +91,11 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description:
           'When true, run with the profiler and resolve the resulting traceId. Default false.',
+      },
+      skip_activation_check: {
+        type: 'boolean',
+        description:
+          "Skip the pre-flight check for unactivated changes. Default false. The check exists because SAP runs the ACTIVE load: with unactivated changes the run returns the previous version's output, which is indistinguishable from a caching bug.",
       },
       description: {
         type: 'string',
@@ -63,6 +141,7 @@ export const TOOL_DEFINITION = {
 interface RuntimeRunClassArgs {
   class_name: string;
   profile?: boolean;
+  skip_activation_check?: boolean;
   description?: string;
   all_procedural_units?: boolean;
   all_misc_abap_statements?: boolean;
@@ -94,11 +173,55 @@ export async function handleRuntimeRunClass(
     }
 
     const className = args.class_name.trim().toUpperCase();
+
+    // Fail loudly on a stale active load rather than returning last version's
+    // output as though it were this version's.
+    if (args.skip_activation_check !== true) {
+      const staleReason = await findStaleActiveVersion(
+        connection,
+        className,
+        logger,
+      );
+      if (staleReason) {
+        return return_error(
+          new Error(
+            `${staleReason} Pass skip_activation_check=true to run the active version anyway.`,
+          ),
+        );
+      }
+    }
+
     const executor = new AdtExecutor(connection, logger);
     const classExecutor = executor.getClassExecutor();
 
     if (!args.profile) {
       const response = await classExecutor.run({ className });
+
+      // SAP answers 200 and puts "does not implement if_oo_adt_classrun~main"
+      // in the BODY, so this failure would otherwise be handed back as though
+      // it were the class's own output. Two very different causes produce it,
+      // and the source settles which: either the class really lacks the
+      // interface, or its runtime load is stale.
+      //
+      // Observed on DS4: a freshly created class whose first update ADDS the
+      // interface stays unrunnable even though activation reports success and
+      // the active source declares the interface. Waiting does not clear it
+      // (a 2s retry was tried and does not work) — a further activation run
+      // does. This handler will not activate anything on the caller's behalf,
+      // so it reports the situation precisely instead.
+      if (STALE_LOAD_PATTERN.test(String(response.data ?? ''))) {
+        const activeSource =
+          (await readClassSource(connection, className, 'active')) ?? '';
+        const declaresInterface = /if_oo_adt_classrun/i.test(activeSource);
+
+        return return_error(
+          new Error(
+            declaresInterface
+              ? `Class ${className} reports that it does not implement if_oo_adt_classrun~main, but its ACTIVE source does declare the interface. The runtime load is stale. Observed cause: a newly created class that had the interface added in its first update. Note that re-running ActivateObjects does NOT fix this — SAP answers activationExecuted="false" for an already-active class and the load is not regenerated. What does work is an activation that actually activates something: change the source (even trivially), then activate; or delete and re-create the class with the interface present from the start.`
+              : `Class ${className} does not implement if_oo_adt_classrun~main. Add "INTERFACES if_oo_adt_classrun." to the public section and implement if_oo_adt_classrun~main.`,
+          ),
+        );
+      }
       return return_response({
         data: JSON.stringify(
           {

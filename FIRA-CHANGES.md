@@ -450,3 +450,29 @@ grupos de funciones se despliegan en módulos e includes. A ~0,87 s por unidad
 (dos lecturas ADT, concurrencia 6) el paquete entero serían ~85 minutos; con el
 tope por defecto de 200, unos 3 minutos. Pendiente: subir concurrencia o
 permitir filtrar por tipo de objeto.
+
+### Verificar que un env apunta al sistema que dice
+
+Un fichero de sesión declara `SAP_MASTER_SYSTEM`, pero eso es solo una etiqueta:
+nada garantiza que la URL lleve a ese sistema. Para confirmarlo de verdad, una
+consulta al propio SAP vía Data Preview:
+
+```sql
+SELECT @SY-SYSID AS SID, MANDT, MTEXT FROM T000 WHERE MANDT = @SY-MANDT
+```
+
+Devuelve el ID real del sistema y el nombre del mandante. Comprobado en el
+paisaje: DS4/100 "Mandante DS4", QS4/100 "Mandante Calidad", PS4/100 "Mandante
+Producción". Vale la pena hacerlo al dar de alta un sistema nuevo, sobre todo si
+la URL se dedujo de un patrón de nombres.
+
+Ojo con el `Accept` del endpoint: `application/xml` a secas devuelve 406. Hay que
+enviar `application/xml, application/vnd.sap.adt.datapreview.table.v1+xml`.
+
+### Qué nodos SICF hacen falta realmente
+
+Las tres herramientas de comparación solo leen fuentes de objetos, así que les
+basta con los nodos de objetos (`/sap/bc/adt/oo/classes/…`,
+`/sap/bc/adt/programs/…`, `/sap/bc/adt/ddic/…`). NO necesitan
+`/sap/bc/adt/discovery`. Comprobado en PS4: funcionaban con discovery aún en
+403. Útil para pedir a Basis lo mínimo imprescindible en un sistema productivo.

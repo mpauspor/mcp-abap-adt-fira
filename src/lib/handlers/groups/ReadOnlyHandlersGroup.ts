@@ -170,6 +170,11 @@ import {
   handleListTransports,
   TOOL_DEFINITION as ListTransports_Tool,
 } from '../../../handlers/transport/readonly/handleListTransports';
+import {
+  addOutputFileToSchema,
+  shouldOfferOutputFile,
+  withOutputToFile,
+} from '../../fileTransfer.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -212,7 +217,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   }
 
   private getAllEntries(): HandlerEntry[] {
-    return [
+    const entries: HandlerEntry[] = [
       // Existing readonly handlers
       {
         toolDefinition: GetTableContents_Tool,
@@ -397,5 +402,23 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleReadServiceBinding(this.context, args),
       },
     ];
+
+    // Any read tool can divert its output to a local file. Opt-in per call:
+    // without `to_file` nothing changes. This is what makes a 165 KB source or
+    // a large result set usable without spending the context window on it.
+    return entries.map((entry) =>
+      shouldOfferOutputFile(entry.toolDefinition.name)
+        ? {
+            ...entry,
+            toolDefinition: {
+              ...entry.toolDefinition,
+              inputSchema: addOutputFileToSchema(
+                entry.toolDefinition.inputSchema,
+              ),
+            },
+            handler: withOutputToFile(entry.handler),
+          }
+        : entry,
+    );
   }
 }

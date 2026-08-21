@@ -555,7 +555,17 @@ import {
   isMutatingToolName,
   withCriticalSection,
 } from '../../criticalSection.js';
-import { withWriteVerification } from '../../writeVerification.js';
+import {
+  addOutputFileToSchema,
+  addSourcePathToSchema,
+  shouldOfferOutputFile,
+  withOutputToFile,
+  withSourceFromFile,
+} from '../../fileTransfer.js';
+import {
+  SOURCE_WRITE_TOOLS,
+  withWriteVerification,
+} from '../../writeVerification.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -576,7 +586,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       return (args: unknown) => handler(this.context, args as TArgs);
     };
 
-    const entries: HandlerEntry[] = [
+    let entries: HandlerEntry[] = [
       // Common — group activation
       {
         toolDefinition: ActivateObjects_Tool,
@@ -1215,10 +1225,46 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
     // section so a slow request is not aborted mid-flight, which would drop the
     // stateful session and orphan the lock (leaving the object locked/inactive).
     // No-op on connections older than @mcp-abap-adt/connection 1.10.0.
+    // Read-shaped tools live in this group too (GetProgram, GetClass, ...), and
+    // they are exactly the ones that return a whole source. They get the same
+    // to_file escape hatch as the read-only group.
+    entries = entries.map((entry) =>
+      shouldOfferOutputFile(entry.toolDefinition.name)
+        ? {
+            ...entry,
+            toolDefinition: {
+              ...entry.toolDefinition,
+              inputSchema: addOutputFileToSchema(
+                entry.toolDefinition.inputSchema,
+              ),
+            },
+            handler: withOutputToFile(entry.handler),
+          }
+        : entry,
+    );
+
+    // Source-carrying Update* tools accept the source from a local file, so a
+    // program too large for a tool call can still be written.
+    const withFiles = entries.map((entry) => {
+      const descriptor = SOURCE_WRITE_TOOLS[entry.toolDefinition.name];
+      if (!descriptor) return entry;
+      return {
+        ...entry,
+        toolDefinition: {
+          ...entry.toolDefinition,
+          inputSchema: addSourcePathToSchema(
+            entry.toolDefinition.inputSchema,
+            descriptor.sourceArg,
+          ),
+        },
+        handler: withSourceFromFile(descriptor.sourceArg, entry.handler),
+      };
+    });
+
     // Source-carrying Update* tools additionally read the object back and
     // compare, so `success` reports a write that happened rather than one that
     // merely did not throw. No-op for tools absent from SOURCE_WRITE_TOOLS.
-    const verified = entries.map((entry) => ({
+    const verified = withFiles.map((entry) => ({
       ...entry,
       handler: withWriteVerification(
         entry.toolDefinition.name,

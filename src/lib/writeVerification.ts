@@ -22,6 +22,12 @@ import { verifySourceWritten } from './verifyWrite';
 interface SourceWriteDescriptor {
   /** Handler argument holding the source text. */
   sourceArg: string;
+  /**
+   * Set when the handler already reads the object back itself. Such tools are
+   * still listed here so `source_path` knows where their source argument is,
+   * but they are skipped by the verification wrapper to avoid a second read.
+   */
+  verifiesInline?: boolean;
   /** Builds the ADT source URL from the handler's arguments. */
   sourceUrl: (args: any) => string | undefined;
   /** Human label for messages, e.g. `Class ZCL_FOO`. */
@@ -61,6 +67,20 @@ const named = (prefix: string, nameArg: string) => (args: any) =>
  * yet — they are unverified, not verified-and-passing.
  */
 export const SOURCE_WRITE_TOOLS: Record<string, SourceWriteDescriptor> = {
+  // Verify inline (they guard include-vs-program routing), listed here so a
+  // large source can still be supplied from a file.
+  UpdateProgram: {
+    sourceArg: 'source_code',
+    verifiesInline: true,
+    sourceUrl: sourceUnder('programs/programs', 'program_name'),
+    label: named('Program', 'program_name'),
+  },
+  UpdateInclude: {
+    sourceArg: 'source_code',
+    verifiesInline: true,
+    sourceUrl: sourceUnder('programs/includes', 'include_name'),
+    label: named('Include', 'include_name'),
+  },
   UpdateClass: {
     sourceArg: 'source_code',
     sourceUrl: sourceUnder('oo/classes', 'class_name'),
@@ -192,7 +212,7 @@ export function withWriteVerification<H extends (...args: any[]) => any>(
   getContext: () => { connection: IAbapConnection; logger?: ILogger },
 ): (...args: Parameters<H>) => Promise<Awaited<ReturnType<H>>> {
   const descriptor = SOURCE_WRITE_TOOLS[toolName];
-  if (!descriptor) {
+  if (!descriptor || descriptor.verifiesInline) {
     return handler as (
       ...args: Parameters<H>
     ) => Promise<Awaited<ReturnType<H>>>;

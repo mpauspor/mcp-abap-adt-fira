@@ -522,3 +522,60 @@ llegó a integración y no a producción.
 
 El filtro `object_types` es lo que hace usable un paquete grande: sin él, `ZSD`
 expande a ~5.800 unidades.
+
+---
+
+# Quinta tanda: objetos que no caben en una llamada
+
+Cierra el hueco de los ~140 KB de la lista original. `Z_DETALLADO_NEW` en DS4
+ocupa **165 KB**: no se podía escribir, y leerlo se comía una porción enorme del
+contexto.
+
+**Nuevo:** `src/lib/fileTransfer.ts`, cableado en los dos grupos de handlers.
+
+El servidor MCP corre en la máquina del usuario, así que puede tocar el sistema
+de ficheros directamente. Ni el código ni el resultado pasan por la conversación.
+
+| Parámetro | Dónde | Qué hace |
+|---|---|---|
+| `source_path` | 15 herramientas `Update*` | Lee la fuente de un fichero local |
+| `to_file` | Herramientas `Get/Read/List/Search/Compare/Describe/Runtime` | Escribe la salida a disco y devuelve solo un resumen |
+
+Ambos son opcionales: una llamada que no los use se comporta igual que antes.
+
+## Detalles que costaron una iteración cada uno
+
+**El BOM.** Los editores de Windows añaden marca de orden de bytes. Un BOM
+delante de `REPORT ...` no es espacio en blanco para el compilador ABAP: produce
+un error de sintaxis invisible en el editor que lo creó. Se elimina al leer.
+Verificado: fichero de 88 bytes → 85 escritos en SAP.
+
+**Cada handler llama distinto a la fuente.** `GetProgram` la devuelve como
+`program_data`, `GetClass` como `source_code`, `GetDdl` como `source`,
+`GetInterface` como `interface_data`. Sin reconocerlos, `to_file` escribía el
+sobre JSON con el código escapado dentro — inservible para editar. Ahora se
+extrae la fuente cuando se reconoce, se escribe entera si no, y el resumen
+**siempre dice cuál de las dos cosas hizo**.
+
+**Solo en las herramientas que pueden devolver algo grande.** Añadir dos
+propiedades de esquema a las 223 herramientas costaría contexto en cada petición
+para comprar una opción que nadie usaría en un borrado.
+
+## Salvaguardas
+
+- No sobrescribe un fichero existente sin `overwrite: true`; el error nombra el
+  fichero y su tamaño.
+- Rechaza recibir `source_path` y la fuente inline a la vez, en vez de elegir una
+  — adivinar mal escribe el código equivocado en SAP.
+- Límite de 10 MB al leer.
+- Un error del handler no se escribe al fichero del usuario.
+
+## Ciclo de trabajo
+
+```
+GetProgram  → to_file=C:	mp\z_det.abap     (165 KB a disco, 6 líneas de vuelta)
+   editar el fichero
+UpdateProgram → source_path=C:	mp\z_det.abap
+```
+
+✅ Probado de extremo a extremo contra DS4, incluidas las cuatro salvaguardas.

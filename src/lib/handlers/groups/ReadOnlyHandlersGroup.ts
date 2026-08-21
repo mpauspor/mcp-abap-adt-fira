@@ -115,6 +115,10 @@ import {
   handleCompareObjectAcrossSystems,
 } from '../../../handlers/multisystem/readonly/handleCompareObjectAcrossSystems';
 import {
+  TOOL_DEFINITION as ComparePackageAcrossLandscape_Tool,
+  handleComparePackageAcrossLandscape,
+} from '../../../handlers/multisystem/readonly/handleComparePackageAcrossLandscape';
+import {
   TOOL_DEFINITION as ComparePackageAcrossSystems_Tool,
   handleComparePackageAcrossSystems,
 } from '../../../handlers/multisystem/readonly/handleComparePackageAcrossSystems';
@@ -240,6 +244,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ComparePackageAcrossSystems_Tool,
         handler: (args: any) =>
           handleComparePackageAcrossSystems(this.context, args),
+      },
+      {
+        toolDefinition: ComparePackageAcrossLandscape_Tool,
+        handler: (args: any) =>
+          handleComparePackageAcrossLandscape(this.context, args),
       },
       {
         toolDefinition: AbapGitGetRepo_Tool,

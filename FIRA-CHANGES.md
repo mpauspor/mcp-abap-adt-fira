@@ -476,3 +476,49 @@ basta con los nodos de objetos (`/sap/bc/adt/oo/classes/…`,
 `/sap/bc/adt/programs/…`, `/sap/bc/adt/ddic/…`). NO necesitan
 `/sap/bc/adt/discovery`. Comprobado en PS4: funcionaban con discovery aún en
 403. Útil para pedir a Basis lo mínimo imprescindible en un sistema productivo.
+
+---
+
+# Cuarta tanda: barrido del paisaje completo
+
+**Nuevo:** `ComparePackageAcrossLandscape` y `src/lib/adt/packageUnits.ts`.
+
+Una sola llamada recorre la cadena de promoción (DS4 → QS4 → PS4) y dice, por
+objeto, hasta dónde ha llegado. Antes eran dos llamadas por paquete y cruzar los
+resultados a mano.
+
+## Lectura conservadora a propósito
+
+Si un sistema **posterior** coincide con el origen mientras uno **anterior** no,
+eso NO es un estado de promoción: significa que alguien tocó algo fuera de la
+cadena de transportes. Se marca como `out_of_band` con aviso explícito, en vez
+de etiquetarlo "promovido" y esconder justo el problema que interesa encontrar.
+
+Estados: `promoted`, `pending` (con `reached_through` / `pending_from`),
+`not_transported`, `out_of_band`, `unreadable`.
+
+## La expansión de grupos de funciones era el cuello de botella
+
+`collectComparableUnits` expandía cada grupo dentro de un bucle secuencial con
+`await`: un viaje en serie por grupo **antes** de empezar a comparar. En un
+paquete con muchos grupos eso dominaba el tiempo total, muy por encima de las
+comparaciones.
+
+Ahora clasifica primero y expande después, en paralelo. Medido sobre `ZSD`,
+60 unidades × 3 sistemas:
+
+| | Antes | Después |
+|---|---|---|
+| Tiempo | 43 s | **15 s** |
+
+Mismo resultado. El orden del paquete se conserva reensamblando por posición.
+
+## Ejemplo real
+
+`ZFIRA` filtrado a `CLAS/OC`: 4.927 objetos en el paquete → 110 clases
+comparadas en 21 s (concurrencia 12). **99 promovidas, 11 pendientes**, y entre
+ellas `ZCL_IM_ME_PROCESS_REQ_CUST` con `{qs4: identical, ps4: different}` —
+llegó a integración y no a producción.
+
+El filtro `object_types` es lo que hace usable un paquete grande: sin él, `ZSD`
+expande a ~5.800 unidades.

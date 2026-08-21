@@ -13,7 +13,10 @@
  * includes, which do have comparable source.
  */
 
-import { buildObjectUri } from '../../../lib/adt/objectUri';
+import {
+  collectComparableUnits,
+  mapLimited,
+} from '../../../lib/adt/packageUnits';
 import {
   getSecondaryConnection,
   normalizeForComparison,
@@ -21,11 +24,7 @@ import {
 } from '../../../lib/adt/secondarySystem';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 /** Above this the comparison turns into hundreds of round trips per system. */
 const MAX_OBJECTS = 200;
@@ -76,70 +75,6 @@ interface ComparePackageArgs {
   max_objects?: number;
 }
 
-/** A single thing that can be diffed, with the URL its source lives at. */
-interface ComparableUnit {
-  name: string;
-  type: string;
-  /** Owning function group, when this unit came from expanding one. */
-  parent?: string;
-  url: string;
-}
-
-/** Object types whose content lives directly at `/source/main`. */
-const DIRECT_SOURCE_TYPES = new Set([
-  'CLAS/OC',
-  'CLAS',
-  'INTF/OI',
-  'INTF',
-  'PROG/P',
-  'PROG',
-  'PROG/I',
-  'INCL',
-  'DDLS/DF',
-  'DDLS',
-  'TABL/DT',
-  'TABL',
-  // A package lists structures as TABL/DS, not STRU/DS. Omitting it skipped
-  // 165 structures in ZSD alone — they read fine from /ddic/structures/.
-  'TABL/DS',
-  'STRU/DS',
-  'STRU',
-  'BDEF/BDO',
-  'BDEF',
-  'SRVD/SRV',
-  'SRVD',
-  'DDLX/EX',
-  'DDLX',
-]);
-
-const FUNCTION_GROUP_TYPES = new Set(['FUGR/F', 'FUGR', 'FUNC']);
-
-const lower = (value: string) => encodeSapObjectName(value).toLowerCase();
-
-/** Run over `items` with bounded concurrency, preserving order. */
-async function mapLimited<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-
-  const workers = Array.from(
-    { length: Math.min(limit, items.length) },
-    async () => {
-      for (;;) {
-        const index = cursor++;
-        if (index >= items.length) return;
-        results[index] = await fn(items[index]);
-      }
-    },
-  );
-
-  await Promise.all(workers);
-  return results;
-}
-
 export async function handleComparePackageAcrossSystems(
   context: HandlerContext,
   args: ComparePackageArgs,
@@ -161,77 +96,12 @@ export async function handleComparePackageAcrossSystems(
 
     // The package listing comes from the CURRENT system: the question is what
     // of our development has arrived elsewhere, so this side defines the set.
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
-    const rawItems: any[] = await utils.getPackageContentsList(packageName, {
-      includeSubpackages: args.include_subpackages === true,
-    });
-    const items = Array.isArray(rawItems) ? rawItems : [];
-
-    const units: ComparableUnit[] = [];
-    const notComparable: Array<{ name: string; type: string }> = [];
-
-    for (const item of items) {
-      const name = String(
-        item?.name ?? item?.OBJECT_NAME ?? item?.objectName ?? '',
-      ).toUpperCase();
-      const type = String(
-        item?.type ?? item?.OBJECT_TYPE ?? item?.objectType ?? '',
-      );
-      if (!name) continue;
-
-      if (DIRECT_SOURCE_TYPES.has(type)) {
-        try {
-          units.push({
-            name,
-            type,
-            url: `${buildObjectUri({ name, type })}/source/main`,
-          });
-        } catch {
-          notComparable.push({ name, type });
-        }
-        continue;
-      }
-
-      if (FUNCTION_GROUP_TYPES.has(type)) {
-        // Expand: the group itself has no source, its modules and includes do.
-        try {
-          const [modules, includes] = await Promise.all([
-            utils.listFunctionModules(name).catch(() => [] as string[]),
-            utils.listFunctionGroupIncludes(name).catch(() => [] as string[]),
-          ]);
-
-          for (const fm of modules as string[]) {
-            units.push({
-              name: String(fm).toUpperCase(),
-              type: 'FUGR/FF',
-              parent: name,
-              url: `/sap/bc/adt/functions/groups/${lower(name)}/fmodules/${lower(String(fm))}/source/main`,
-            });
-          }
-          for (const include of includes as string[]) {
-            units.push({
-              name: String(include).toUpperCase(),
-              type: 'FUGR/I',
-              parent: name,
-              url: `/sap/bc/adt/functions/groups/${lower(name)}/includes/${lower(String(include))}/source/main`,
-            });
-          }
-
-          if (
-            (modules as string[]).length === 0 &&
-            (includes as string[]).length === 0
-          ) {
-            notComparable.push({ name, type });
-          }
-        } catch {
-          notComparable.push({ name, type });
-        }
-        continue;
-      }
-
-      notComparable.push({ name, type });
-    }
+    const utils = createAdtClient(connection, logger).getUtils();
+    const { units, notComparable, objectCount } = await collectComparableUnits(
+      utils as any,
+      packageName,
+      { includeSubpackages: args.include_subpackages === true },
+    );
 
     const cap = Math.min(
       MAX_OBJECTS,
@@ -309,7 +179,7 @@ export async function handleComparePackageAcrossSystems(
           package_name: packageName,
           source_system: '(current)',
           target_system: args.target_system,
-          objects_in_package: items.length,
+          objects_in_package: objectCount,
           units_compared: selected.length,
           summary,
           in_sync:

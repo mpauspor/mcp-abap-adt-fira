@@ -635,3 +635,61 @@ desarrollador como un éxito equivocado.
 Solo `includeLifecycle` escribe. Crea `ZZFIRA_T_INC` en `$TMP` y lo borra en
 `afterAll`, también tras un fallo — un include bloqueado y huérfano bloquearía la
 siguiente ejecución.
+
+---
+
+# Séptima tanda: el depurador, ciclo completo
+
+**Nuevo:** `DebuggerSetBreakpoint`, `DebuggerListBreakpoints`,
+`DebuggerDeleteBreakpoint`, `src/lib/adt/debuggerBreakpoints.ts` y
+`src/lib/adt/debuggerSession.ts`.
+
+Ciclo verificado en DS4: poner breakpoint → capturar → **enganchar** → pila →
+variables → paso → continuar → parar.
+
+## Los cuatro obstáculos, y cómo se resolvieron
+
+**1. El esquema XML no estaba documentado.** Se recuperó provocando errores:
+una raíz inventada hace que SAP nombre la que espera, y un atributo ausente
+también se nombra. Eso dio el 80%. Lo que no dio: SAP nombra **atributos** que
+faltan pero no **elementos**, y lo que faltaba era un hijo `<syncScope>`. Cada
+*"Data is invalid and could not be converted"* de aquella búsqueda era ese
+elemento. Se cerró consultando `abap-adt-api`.
+
+**2. El `Accept` descartaba la captura.** El listener pedía solo
+`application/xml`, pero un debuggee vuelve en un tipo de medio propio de SAP:
+**406 `ExceptionResourceNotAcceptable`**. Capturaba y tiraba el resultado.
+
+**3. Faltaba el attach.** La captura solo entrega un `DEBUGGEE_ID`; sin
+`POST /sap/bc/adt/debugger?method=attach` toda llamada posterior responde como
+si no hubiera sesión. Ahora `DebuggerListen` engancha automáticamente.
+
+**4. La sesión debe ser stateful.** Attach, pila, variables y pasos tienen que
+llegar por la misma sesión ABAP. Sin ello el attach informa éxito y todo lo
+demás falla — la misma firma que el 423 de los includes.
+
+## Lo que hay que saber para usarlo
+
+**Un breakpoint puesto en SAP GUI no sirve.** Es de sesión: lo atiende el
+debugger clásico y ADT no lo ve. Verificado — con uno puesto en SE38, la lista
+de ADT seguía vacía y el listener esperó 240 s sin capturar nada.
+
+**Hay que disparar el código por HTTP/RFC**, no desde SAP GUI:
+`RuntimeRunProgram`, `RuntimeRunClass`, un servicio OData. Disparado por ADT se
+capturó al primer intento.
+
+**`continue` que llega al final del programa** devuelve una excepción con
+`subType=debuggeeEnded`. Es el resultado normal, no un fallo, y se reporta como
+tal.
+
+## Limitación conocida
+
+`DebuggerListBreakpoints` **siempre devuelve cero**. El `GET` de ese endpoint no
+es un listado: la relación se llama *synchronize* y devuelve conflictos.
+Comprobado con cuatro combinaciones de parámetros, incluso justo después de un
+POST exitoso.
+
+Consecuencia: como `syncScope mode="full"` reemplaza el conjunto entero y no se
+puede leer el actual, **poner un breakpoint sustituye a los anteriores** de esta
+misma identidad de IDE. Pendiente: llevar un registro en memoria de los puestos
+desde aquí y reenviarlo completo.

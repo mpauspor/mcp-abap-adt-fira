@@ -51,6 +51,10 @@ import {
   handleDebuggerGetVariable,
 } from '../../../handlers/debugger/readonly/handleDebuggerGetVariable';
 import {
+  TOOL_DEFINITION as DebuggerListBreakpoints_Tool,
+  handleDebuggerListBreakpoints,
+} from '../../../handlers/debugger/readonly/handleDebuggerListBreakpoints';
+import {
   handleReadDomain,
   TOOL_DEFINITION as ReadDomain_Tool,
 } from '../../../handlers/domain/readonly/handleReadDomain';
@@ -266,6 +270,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DebuggerGetStack_Tool,
         handler: (args: any) => handleDebuggerGetStack(this.context, args),
+      },
+      {
+        toolDefinition: DebuggerListBreakpoints_Tool,
+        handler: (args: any) =>
+          handleDebuggerListBreakpoints(this.context, args),
       },
       {
         toolDefinition: DebuggerGetVariable_Tool,

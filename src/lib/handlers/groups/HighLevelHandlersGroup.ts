@@ -194,9 +194,17 @@ import {
   handleActivateMetadataExtension,
 } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 import {
+  TOOL_DEFINITION as DebuggerDeleteBreakpoint_Tool,
+  handleDebuggerDeleteBreakpoint,
+} from '../../../handlers/debugger/high/handleDebuggerDeleteBreakpoint';
+import {
   TOOL_DEFINITION as DebuggerListen_Tool,
   handleDebuggerListen,
 } from '../../../handlers/debugger/high/handleDebuggerListen';
+import {
+  TOOL_DEFINITION as DebuggerSetBreakpoint_Tool,
+  handleDebuggerSetBreakpoint,
+} from '../../../handlers/debugger/high/handleDebuggerSetBreakpoint';
 import {
   TOOL_DEFINITION as DebuggerStep_Tool,
   handleDebuggerStep,
@@ -1098,6 +1106,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleAbapGitUnlink),
       },
       // ABAP debugger
+      {
+        toolDefinition: DebuggerSetBreakpoint_Tool,
+        handler: withContext(handleDebuggerSetBreakpoint),
+      },
+      {
+        toolDefinition: DebuggerDeleteBreakpoint_Tool,
+        handler: withContext(handleDebuggerDeleteBreakpoint),
+      },
       {
         toolDefinition: DebuggerListen_Tool,
         handler: withContext(handleDebuggerListen),

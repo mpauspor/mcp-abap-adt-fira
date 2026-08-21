@@ -2,7 +2,7 @@
  * DebuggerGetStack - read the call stack of the attached debuggee.
  */
 
-import { AbapDebugger } from '@mcp-abap-adt/adt-clients';
+import { getStack } from '../../../lib/adt/debuggerSession';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -23,21 +23,13 @@ export async function handleDebuggerGetStack(
 ) {
   const { connection, logger } = context;
   try {
-    const abapDebugger = new AbapDebugger(connection, logger as any);
-    const response = await abapDebugger.getCallStack();
+    // Needs method=getStack; without it SAP does not recognise the request.
+    const stack = await getStack(connection);
 
     return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          stack:
-            typeof response.data === 'string' ? response.data : response.data,
-        },
-        null,
-        2,
-      ),
-      status: response.status ?? 200,
-      statusText: response.statusText ?? 'OK',
+      data: JSON.stringify({ success: true, stack }, null, 2),
+      status: 200,
+      statusText: 'OK',
       headers: {},
       config: {} as any,
     });

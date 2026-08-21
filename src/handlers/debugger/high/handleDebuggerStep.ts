@@ -6,7 +6,7 @@
  * step with a separate DebuggerGetStack.
  */
 
-import { AbapDebugger } from '@mcp-abap-adt/adt-clients';
+import { type DebugStep, step } from '../../../lib/adt/debuggerSession';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 
@@ -42,46 +42,66 @@ export async function handleDebuggerStep(
       );
     }
 
-    const abapDebugger = new AbapDebugger(connection, logger as any);
+    // SAP's own action names, passed as method= on /sap/bc/adt/debugger.
+    const actions: Record<string, DebugStep> = {
+      step_into: 'stepInto',
+      step_over: 'stepOver',
+      step_return: 'stepReturn',
+      continue: 'stepContinue',
+      terminate: 'terminateDebuggee',
+    };
 
-    let response: any;
-    switch (action) {
-      case 'step_into':
-        response = await abapDebugger.stepIntoBatch();
-        break;
-      case 'step_over':
-        // 'stepOver' is the ADT action name; the batch helper covers into,
-        // out and continue only, so this goes through executeAction.
-        response = await abapDebugger.executeAction('stepOver');
-        break;
-      case 'step_return':
-        response = await abapDebugger.stepOutBatch();
-        break;
-      case 'continue':
-        response = await abapDebugger.stepContinueBatch();
-        break;
-      default:
-        return return_error(
-          `Unknown action "${action}". Use step_into, step_over, step_return or continue.`,
-        );
+    const mapped = actions[action];
+    if (!mapped) {
+      return return_error(
+        `Unknown action "${action}". Use step_into, step_over, step_return, continue or terminate.`,
+      );
     }
+
+    const result = await step(connection, mapped, logger);
 
     return return_response({
       data: JSON.stringify(
         {
           success: true,
           action,
-          result: response.data,
+          sap_action: mapped,
+          result,
         },
         null,
         2,
       ),
-      status: response.status ?? 200,
-      statusText: response.statusText ?? 'OK',
+      status: 200,
+      statusText: 'OK',
       headers: {},
       config: {} as any,
     });
   } catch (error: any) {
+    // Continuing a program with no further breakpoints runs it to completion.
+    // SAP reports that as an exception carrying subType=debuggeeEnded, but it
+    // is the expected outcome of `continue`, not a failure — surfacing it as an
+    // error would make a normal finish look broken.
+    const body = String(error?.response?.data ?? '');
+    if (body.includes('debuggeeEnded')) {
+      return return_response({
+        data: JSON.stringify(
+          {
+            success: true,
+            action: args?.action,
+            debuggee_ended: true,
+            message:
+              'The program ran to completion and the debug session ended. Nothing is attached now — run DebuggerListen again to catch another execution.',
+          },
+          null,
+          2,
+        ),
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      });
+    }
+
     const status = error?.response?.status;
     if (status === 404 || status === 409) {
       return return_error(

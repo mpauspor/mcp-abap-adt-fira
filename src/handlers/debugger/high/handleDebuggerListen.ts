@@ -13,6 +13,10 @@ import {
   getDebuggerIdentity,
   getDebuggerUser,
 } from '../../../lib/adt/debuggerIdentity';
+import {
+  attachDebuggee,
+  parseDebuggee,
+} from '../../../lib/adt/debuggerSession';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   makeAdtRequestWithTimeout,
@@ -89,6 +93,13 @@ export async function handleDebuggerListen(
       isNotifiedOnConflict: 'true',
     });
 
+    // A debugger session lives in a STATEFUL ABAP session: the attach, the
+    // stack, the variables and every step must arrive on the same one. Sent
+    // stateless, the attach reports success and every later call answers as
+    // though nothing were attached. Same failure shape as an include lock
+    // issued outside its session.
+    connection.setSessionType('stateful');
+
     // The HTTP timeout has to outlast the wait we are asking SAP for,
     // otherwise the client aborts a listener that is working correctly.
     const httpTimeoutMs = (timeoutSeconds + 15) * 1000;
@@ -103,7 +114,11 @@ export async function handleDebuggerListen(
         null,
         undefined,
         {
-          Accept: 'application/xml',
+          // A caught debuggee comes back in its own SAP media type, not plain
+          // application/xml. Asking only for application/xml made SAP answer
+          // 406 ExceptionResourceNotAcceptable — the listener HAD caught the
+          // session and the response was thrown away in content negotiation.
+          Accept: '*/*',
           'X-sap-adt-relation':
             'http://www.sap.com/adt/debugger/relations/launch',
         },
@@ -132,19 +147,54 @@ export async function handleDebuggerListen(
     // An empty body means the wait ended without catching anything — a normal
     // outcome, not an error.
     const caught = !!body && body.trim().length > 0 && body.includes('<');
+    const debuggee = caught ? parseDebuggee(body) : undefined;
+
+    // Attach immediately. Catching only yields a DEBUGGEE_ID; until the session
+    // is attached to it every later call behaves as though nothing had been
+    // caught, which is indistinguishable from the listener having failed.
+    let attached = false;
+    let reachedBreakpoints: any[] = [];
+    if (debuggee) {
+      try {
+        const result = await attachDebuggee(
+          connection,
+          debuggee.debuggeeId,
+          logger,
+        );
+        attached = true;
+        reachedBreakpoints = result.reachedBreakpoints;
+      } catch (attachError: any) {
+        logger?.error(
+          `Caught debuggee ${debuggee.debuggeeId} but could not attach: ${attachError?.message || attachError}`,
+        );
+      }
+    }
 
     return return_response({
       data: JSON.stringify(
         {
           success: true,
           caught_debuggee: caught,
+          attached,
           request_user: requestUser,
           ide_id: identity.ideId,
           timeout_seconds: timeoutSeconds,
-          debuggee: caught ? body : undefined,
-          message: caught
-            ? 'A debuggee was caught. Use DebuggerGetStack and DebuggerGetVariables, then DebuggerStop when finished.'
-            : `No session hit a breakpoint within ${timeoutSeconds}s. Set a breakpoint and trigger the code while this is listening.`,
+          stopped_at: debuggee
+            ? {
+                program: debuggee.program,
+                include: debuggee.include,
+                line: debuggee.line,
+                user: debuggee.user,
+                debuggee_id: debuggee.debuggeeId,
+              }
+            : undefined,
+          reached_breakpoints:
+            reachedBreakpoints.length > 0 ? reachedBreakpoints : undefined,
+          message: !caught
+            ? `No session hit a breakpoint within ${timeoutSeconds}s. NOTE: external breakpoints catch HTTP/RFC sessions — a report run from SAP GUI goes to the classic debugger instead. Trigger the code with RuntimeRunProgram, RuntimeRunClass or an HTTP call.`
+            : attached
+              ? `Stopped in ${debuggee?.program} line ${debuggee?.line}. Use DebuggerGetStack and DebuggerGetVariable, then DebuggerStop when finished.`
+              : 'A debuggee was caught but could not be attached; inspection calls will fail. Run DebuggerStop and retry.',
         },
         null,
         2,

@@ -53,6 +53,10 @@ export async function handleDebuggerStop(
       checkConflict: false,
     });
 
+    // The debugging session held this connection stateful; release it so later
+    // reads are not pinned to it.
+    connection.setSessionType('stateless');
+
     logger?.info(`DebuggerStop: listener released for ${requestUser}`);
 
     return return_response({

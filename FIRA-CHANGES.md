@@ -414,3 +414,39 @@ credenciales de QS4.
 
 ⚠️ **TLS es global al proceso** (`TLS_REJECT_UNAUTHORIZED`), no por conexión: el
 sistema secundario hereda la configuración de arranque.
+
+## Validado contra el paisaje real DS4 / QS4 / PS4
+
+Tres sistemas registrados en `sessions/`: DS4 (desarrollo, sistema actual),
+`qs4` (integración) y `ps4` (producción).
+
+Ejemplo real de análisis de promoción, sobre objetos modificados en DS4 estos
+días:
+
+| Objeto | DS4→QS4 | QS4→PS4 | Lectura |
+|---|---|---|---|
+| `ZCL_SD_ORDER_SERVICE` | different | identical | parado en desarrollo |
+| `ZSD_V1427` | different | identical | parado en desarrollo |
+| `ZMMSDSOL` | different | identical | parado en desarrollo |
+| `ZMM_CL_ENTITY_SERV_ESCANDALLO` | different | different | transporte en vuelo |
+| `Z_DETALLADO_NEW` | identical | identical | promovido |
+
+Un detalle contraintuitivo: `ZSD_V1427` es MÁS PEQUEÑO en DS4 (7.822 b) que en
+QS4/PS4 (8.201 b) pese a ser más reciente. El tamaño no indica la dirección del
+cambio; solo el diff lo dice.
+
+### SICF se activa por nodo, no en bloque
+
+En PS4, `/sap/bc/adt/discovery` y `/sap/bc/adt/core/systeminformation` devuelven
+**403**, pero los nodos de objetos (`/sap/bc/adt/oo/classes/…/source/main`,
+`/sap/bc/adt/programs/programs/…/source/main`) responden **200** con fuente
+real. Conviene no concluir "ADT está cerrado" a partir de un 403 en discovery:
+hay que probar el endpoint que se va a usar.
+
+### Escala
+
+El paquete `ZSD` (976 objetos) expande a ~5.800 unidades comparables, porque los
+grupos de funciones se despliegan en módulos e includes. A ~0,87 s por unidad
+(dos lecturas ADT, concurrencia 6) el paquete entero serían ~85 minutos; con el
+tope por defecto de 200, unos 3 minutos. Pendiente: subir concurrencia o
+permitir filtrar por tipo de objeto.

@@ -203,7 +203,7 @@ export async function handleRuntimeRunClass(
       // and the source settles which: either the class really lacks the
       // interface, or its runtime load is stale.
       //
-      // Observed on DS4: a freshly created class whose first update ADDS the
+      // Observed on a 7.5x system: a freshly created class whose first update ADDS the
       // interface stays unrunnable even though activation reports success and
       // the active source declares the interface. Waiting does not clear it
       // (a 2s retry was tried and does not work) — a further activation run

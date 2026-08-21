@@ -30,7 +30,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request or task number (e.g., DS4K901132). Tasks are released individually before the parent request.',
+          'Transport request or task number (e.g., DEVK900123). Tasks are released individually before the parent request.',
       },
       ignore_locks: {
         type: 'boolean',
@@ -150,7 +150,8 @@ export async function handleReleaseTransport(
 
     // The HTTP status says nothing: SAP answers 200 even for a transport that
     // does not exist. The authoritative signal is tm:releasetimestamp on the
-    // response — zero means nothing was released. (Probed on DS4: a bogus
+    // response — zero means nothing was released. (Probed on a 7.5x system: a
+    // bogus
     // number returns 200 with tm:releasetimestamp="0 ", a real release returns
     // 200 with a timestamp.)
     const releaseParser = new XMLParser({

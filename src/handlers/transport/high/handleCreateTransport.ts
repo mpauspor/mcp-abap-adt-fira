@@ -5,8 +5,8 @@
  * through `@mcp-abap-adt/adt-clients`, whose `createTransport` corrupts two of
  * the three fields that matter:
  *
- * - It wraps the target system in slashes — `tm:target="/QS4/"` — and SAP
- *   answers "Target '/QS4/' does not exist" even for a system that is defined
+ * - It wraps the target system in slashes — `tm:target="/QAS/"` — and SAP
+ *   answers "Target '/QAS/' does not exist" even for a system that is defined
  *   in TMSCSYS. The target must be the bare name, matching what E070-TARSYSTEM
  *   stores (ITE, PRE, PRD, ...).
  * - It passes the owner through verbatim, so a lowercase user name reaches SAP
@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
       target_system: {
         type: 'string',
         description:
-          "Target system as its bare name, e.g. 'QS4', 'PRD', 'ITE' — no slashes, no client suffix. Must be a transport target defined in STMS (see TMSCSYS). If omitted or empty, the request is created as LOCAL.",
+          "Target system as its bare name, e.g. 'QAS', 'PRD' — no slashes, no client suffix. Must be a transport target defined in STMS (see TMSCSYS). If omitted or empty, the request is created as LOCAL.",
       },
       owner: {
         type: 'string',

@@ -9,7 +9,7 @@
  *
  * Reading `/source/main` WITHOUT a version parameter returns the working
  * (inactive) version when one exists, and the active version otherwise.
- * Verified on DS4: with an active ACTIVE_ONE and a pending PENDING_TWO, the
+ * Verified on a 7.5x system: with an active ACTIVE_ONE and a pending PENDING_TWO, the
  * unqualified URL answers PENDING_TWO. That is what makes one comparison
  * correct for both `activate: true` and `activate: false` — qualifying the
  * version would make every non-activating update look like a failed write.
@@ -150,7 +150,7 @@ export const SOURCE_WRITE_TOOLS: Record<string, SourceWriteDescriptor> = {
     sourceArg: 'local_types_code',
     // "Local types" is the CCIMP include, addressed as `implementations` —
     // NOT `types`, which SAP rejects with a 400 uriMappingError. Taken from
-    // AdtLocalTypes in the client, then confirmed against DS4.
+    // AdtLocalTypes in the client, then confirmed against a live system.
     sourceUrl: classInclude('implementations'),
     label: named('Local types of', 'class_name'),
   },

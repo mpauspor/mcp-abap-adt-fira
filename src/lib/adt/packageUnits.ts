@@ -4,7 +4,7 @@
  * Shared by the two-system and landscape-wide comparison tools so the notion of
  * "comparable" cannot drift between them.
  *
- * Two traps are encoded here, both found by probing DS4 rather than by reading
+ * Two traps are encoded here, both found by probing a live system rather than by reading
  * documentation:
  *
  * 1. A package lists structures as `TABL/DS`, not `STRU/DS`. Missing that entry

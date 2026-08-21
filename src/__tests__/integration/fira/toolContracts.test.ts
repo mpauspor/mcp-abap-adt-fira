@@ -3,7 +3,7 @@
  *
  * Releasing a transport is irreversible and puts it in the import queue;
  * catching a debuggee needs someone to trigger code by hand; abapGit needs a
- * server component DS4 does not have. So what is tested here is everything
+ * server component the test system may not have. So what is tested here is everything
  * around the happy path: the guards, the refusals, and the quality of the
  * message when the answer is "no".
  *
@@ -144,7 +144,8 @@ describe('abapGit', () => {
   it(
     'surfaces the server-side reason when the component is absent',
     async () => {
-      // DS4 has no ADT abapGit component: /sap/bc/adt/abapgit is 404. The tool
+      // A system without the ADT abapGit component answers 404 on
+      // /sap/bc/adt/abapgit. The tool
       // must say so rather than report an empty repository list, which would
       // read as "no packages are linked".
       const context = await firaContext();

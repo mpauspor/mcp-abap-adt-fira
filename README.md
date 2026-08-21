@@ -1,421 +1,217 @@
-# <img src="logo.png" alt="mcp-abap-adt logo" width="36" align="absmiddle" /> mcp-abap-adt: Your Gateway to ABAP Development Tools (ADT)
-[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://stand-with-ukraine.pp.ua)
+# mcp-abap-adt-fira
 
-`mcp-abap-adt` is an MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud systems. It gives agents controlled access to real ABAP repositories through ADT, so analysis and changes are grounded in system data instead of assumptions. It is built for AI-assisted pair programming (AIPNV: AI Pairing, Not Vibing), not autopilot vibe coding.
+A fork of **[fr0ster/mcp-abap-adt](https://github.com/fr0ster/mcp-abap-adt)** — an
+MCP server that lets an AI assistant work with an ABAP system over ADT.
 
-**Primary workflows:**
-- **Deep ABAP analysis**: where-used, object metadata, repository navigation, object structure, semantic analysis, dependency and impact exploration.
-- **High-level ABAP development**: rapid CRUD and iterative updates for RAP and classic ABAP artifacts (classes, interfaces, function groups/modules, programs, DDIC, CDS/view/service artifacts), validated through ADT flows.
+This fork keeps everything the original does and adds correctness fixes plus 20
+tools, all developed and verified against a live SAP 7.5x landscape. Base
+installation, configuration and the full tool catalogue are documented in the
+original project; see [README.upstream.md](./README.upstream.md).
 
-**Why teams use it:**
-- **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50)
-- **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
-- Multiple transports: **stdio**, **HTTP**, **SSE**
-- Rich tool surface for ABAP objects, metadata, transports, and search
-
-**Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-
-You can configure MCP clients either manually (JSON/TOML) or via the configurator CLI (`@mcp-abap-adt/configurator`, repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)).
-
-## Table of Contents
-
-1. [Getting Started](#getting-started)
-2. [Architecture](#architecture)
-3. [Quick Start](#quick-start)
-4. [Use Cases](#use-cases)
-5. [Target Users](#target-users)
-6. [Capabilities (High-Level Focus)](#capabilities-high-level-focus)
-7. [Terminology](#terminology)
-8. [Authorization & Destinations](#authorization--destinations)
-9. [Registries](#registries)
-10. [Features](#features)
-11. [Documentation](#documentation)
-12. [Dependencies](#dependencies)
-13. [Running the Server](#running-the-server)
-
-## Getting Started
-
-Install the server and configure your client using the configurator:
-
-```bash
-npm install -g @mcp-abap-adt/core
-npm install -g @mcp-abap-adt/configurator
-
-# stdio (destination)
-mcp-conf --client cline --name abap --mcp TRIAL
-
-# HTTP (streamable HTTP)
-mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --mcp trial
-```
-
-Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).
-
-## Terminology
-
-**Destination**: a local service key filename. You store service keys in the standard `service-keys` directory, and pass the filename (without extension) via `--mcp=<destination>` to select which system to use.
-
-See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the full list.
-
-## Authorization & Destinations
-
-Destination-based auth is the default. Drop service keys into the standard platform folder and use the filename as your destination:
-
-```bash
-mcp-abap-adt --transport=stdio --mcp=TRIAL
-```
-
-Standard service key paths:
-- Unix (Linux/macOS): `~/.config/mcp-abap-adt/service-keys/<destination>.json`
-- Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\<destination>.json`
-
-For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-
-## Architecture
-
-The project provides two main usage patterns:
-
-### 1. Standalone MCP Server (Default)
-Run as a standalone MCP server with stdio, HTTP, or SSE transport:
-```bash
-mcp-abap-adt                           # stdio (default)
-mcp-abap-adt --transport=http          # HTTP mode
-mcp-abap-adt --transport=sse           # SSE mode
-```
-
-### 2. Embeddable Server (For Integration)
-Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express):
-```typescript
-import {
-  EmbeddableMcpServer,
-  NoDedupStrategy, // optional: expose both Read<X> and Get<X>
-} from '@mcp-abap-adt/core/server';
-
-const server = new EmbeddableMcpServer({
-  connection,              // Your AbapConnection instance
-  logger,                  // Optional logger
-  exposition: ['readonly', 'high'],  // Handler groups to expose
-  // Default hides Read<X> when Get<X> is exposed (ReadVsGetDedupStrategy).
-  // Pass NoDedupStrategy to expose both variants instead.
-  // readOnlyDedupStrategy: new NoDedupStrategy(),
-});
-await server.connect(transport);
-```
-
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low/compact, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
-
-## Quick Start
-
-1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
-2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md))
-3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
-4. **Use**:
-   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
-   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-   - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
-
-## Use Cases
-
-- **Impact analysis / where-used before changes**: map object usage and probable blast radius.
-- **Dependency audit**: inspect links across classes, interfaces, DDIC, CDS/views, and RAP artifacts.
-- **Migration and cleanup prep**: extract repository facts to plan refactoring or cloud-readiness work.
-- **RAP and ABAP iterative development**: create/update artifacts quickly with ADT-backed operations.
-- **Automated documentation and RAG ingestion**: pull structured facts from ABAP systems for downstream tooling.
-
-## Target Users
-
-- ABAP developers and ABAP architects
-- RAP developers
-- Team leads and tech leads who need fast repository visibility
-- Teams building RAG/agent workflows for SAP landscapes
-
-## Capabilities (High-Level Focus)
-
-Key examples of high-value workflows and tools:
-
-- **Repository and impact analysis**: `GetWhereUsed`, `DescribeByList`, `GetObjectStructure`, `GetObjectInfo`, `SearchObject`, `GetPackageTree`, `GetPackageContents`
-- **Code and semantic introspection**: `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetIncludesList`
-- **RAP development**: `CreateBehaviorDefinition`, `UpdateBehaviorDefinition`, `CreateBehaviorImplementation`, `UpdateBehaviorImplementation`, `CreateServiceDefinition`, `UpdateServiceDefinition`, `CreateMetadataExtension`, `UpdateMetadataExtension`
-- **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
-- **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
-- **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
-- **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
-
-## Registries
-
-Published in the official MCP Registry and listed on Glama.ai.
-
-- MCP Registry: [docs/deployment/MCP_REGISTRY.md](docs/deployment/MCP_REGISTRY.md)
-- Glama.ai:
-  <a href="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt">
-    <img width="380" height="200" src="https://glama.ai/mcp/servers/@fr0ster/mcp-abap-adt/badge" />
-  </a>
-
-## Features
-
-- **🏗️ Domain Management**: `GetDomain`, `CreateDomain`, `UpdateDomain` - Create, retrieve, and update ABAP domains
-- **📊 Data Element Management**: `GetDataElement`, `CreateDataElement`, `UpdateDataElement` - Create, retrieve, and update ABAP data elements
-- **📦 Table Management**: `GetTable`, `CreateTable`, `GetTableContents` - Create and retrieve ABAP database tables with data preview
-- **🏛️ Structure Management**: `GetStructure`, `CreateStructure` - Create and retrieve ABAP structures
-- **👁️ View Management**: `GetView`, `CreateView`, `UpdateView` - Create and manage CDS Views and Classic Views
-- **🎓 Class Management**: `GetClass`, `CreateClass`, `UpdateClass` - Create, retrieve, and update ABAP classes
-- **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
-- **🔧 Behavior Definition (BDEF) Management**: `GetBehaviorDefinition`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
-- **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
-- **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
-- **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
-- **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
-- **📋 Include Management**: `GetIncludesList` - Recursive include discovery
-- **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
-- **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
-- **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps, system messages, gateway errors), SM02 system messages, Gateway error log
-- **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
-- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
-- **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
-
-> ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
-
-## Documentation
-
-### For Users
-- **[Docs Index](docs/README.md)** - Full documentation index
-- **[Installation Guide](docs/installation/README.md)** - Installation overview and platform guides
-- **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
-- **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
-- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
-- **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
-- **Tools by level**
-  - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
-  - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-  - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-  - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
-
-### For Administrators
-- **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
-- **[Server Configuration](docs/configuration/YAML_CONFIG.md)** - YAML config reference
-
-### For Developers
-- **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
-- **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
-
-## Dependencies
-
-This project uses two npm packages:
-
-- **[@mcp-abap-adt/connection](https://www.npmjs.com/package/@mcp-abap-adt/connection)** – connection/auth/session layer
-- **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients
-
-These packages are automatically installed via `npm install` and are published to npm.
+Licensed MIT, same as the original. Copyright for the base work remains with
+Oleksii Kyslytsia — see [LICENSE](./LICENSE).
 
 ---
 
+## Why this fork exists
 
-## Running the Server
+Three of the bugs fixed here did not raise an error. They returned a plausible
+answer that was wrong, which is the kind of defect that survives longest because
+nobody thinks to check.
 
-### Global Installation (Recommended)
-After installing globally with `npm install -g`, you can run from any directory:
-
-```bash
-# Show help
-mcp-abap-adt --help
-
-# Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
-mcp-abap-adt
-
-# stdio mode (explicit; default when --transport is omitted)
-mcp-abap-adt --transport=stdio
-
-# HTTP mode on custom port (HTTP requires --transport=http)
-mcp-abap-adt --transport=http --port=8080
-
-# Use stdio mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=stdio --mcp=TRIAL
-
-# Use env destination from platform sessions store
-mcp-abap-adt --env=trial
-
-# Use explicit .env file path
-mcp-abap-adt --env-path=/path/to/my.env
-
-# SSE mode (requires .env file or --mcp parameter)
-mcp-abap-adt --transport=sse --port=3001
-
-# SSE mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=sse --mcp=TRIAL
-```
-
-### Development Mode
-```bash
-# Build and run locally
-npm run build
-npm start
-
-# HTTP mode
-npm run start:http
-
-# SSE mode
-npm run start:sse
-```
-
-### Environment Configuration
-
-Env resolution:
-1. `--env-path=<path|file>` (or `MCP_ENV_PATH`) for explicit `.env` file.
-   - Absolute path: used as-is.
-   - Relative path or file name only (e.g. `my.env`): resolved from current working directory.
-2. `--env=<destination>` for destination file in standard sessions store:
-   - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
-   - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. Fallback to `.env` in current working directory.
-
-**Example .env file:**
-```bash
-SAP_URL=https://your-sap-system.com
-SAP_CLIENT=100
-SAP_AUTH_TYPE=basic
-SAP_USERNAME=your-username
-SAP_PASSWORD=your-password
-```
-
-For JWT authentication (SAP BTP):
-```bash
-SAP_URL=https://your-btp-system.com
-SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_JWT_TOKEN=your-jwt-token
-```
-
-For RFC connection:
-```bash
-SAP_URL=https://your-legacy-system.com
-SAP_CLIENT=100
-SAP_AUTH_TYPE=basic
-SAP_USERNAME=your-username
-SAP_PASSWORD=your-password
-SAP_CONNECTION_TYPE=rfc
-```
-
-See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
-
-For client certificate (mTLS) authentication — on-prem HTTP only:
-```bash
-SAP_URL=https://your-sap-system.com
-SAP_AUTH_TYPE=certificate
-
-# PEM format (provide both files):
-SAP_CERT_PATH=/path/to/client.crt
-SAP_CERT_KEY_PATH=/path/to/client.key
-
-# Or PKCS#12 format (alternative to PEM):
-# SAP_CERT_PFX_PATH=/path/to/client.pfx
-# SAP_CERT_PASSPHRASE=your-passphrase
-```
-
-For Kerberos (SPNEGO) authentication — on-prem HTTP only:
-```bash
-SAP_URL=https://your-sap-system.com
-SAP_AUTH_TYPE=kerberos
-
-# Optional: explicit SPN (default: HTTP@<host>)
-# SAP_KERBEROS_SPN=HTTP@mysaphost.corp.example
-# Optional: service class used to derive the SPN when SAP_KERBEROS_SPN is unset (default: HTTP)
-# SAP_KERBEROS_SERVICE=HTTP
-```
-
-**Certificate auth notes:**
-- Identifies the client via mTLS — no `SAP_USERNAME` / `SAP_PASSWORD` required.
-- Provide either PEM files (`SAP_CERT_PATH` + `SAP_CERT_KEY_PATH`) or a PKCS#12 file (`SAP_CERT_PFX_PATH`), not both.
-- On-prem HTTP connections only (`SAP_CONNECTION_TYPE=rfc` is not supported).
-
-**Kerberos auth notes:**
-- Requires a valid Kerberos ticket on the host before starting the server. Obtain one with `kinit` or a keytab.
-- The optional [`kerberos`](https://www.npmjs.com/package/kerberos) npm package must be installed (needs GSSAPI dev libs on Linux / build tools on Windows): `npm i kerberos`.
-- No `SAP_USERNAME` / `SAP_PASSWORD` required — identity comes from the TGT.
-- Both auth types bypass the auth-broker; use `.env` directly.
-- **NTLM is hard-rejected:** if the SAP system offers NTLM instead of Kerberos/SPNEGO, the connection fails with a clear error rather than silently downgrading. Ensure the system accepts Kerberos (SPNEGO) for your user.
-
-> **⚠️ Help wanted — not yet validated on a live system.** Certificate and Kerberos auth pass full unit coverage but have not been tested against a real SAP system. If you have on-prem **client-certificate** or **Kerberos/SPNEGO** SSO, please try it and [open an issue](https://github.com/fr0ster/mcp-abap-adt/issues) with results — especially whether Kerberos succeeds with a single-leg Negotiate token or your system needs mutual-auth continuation.
-
-**Generate .env from Service Key (JWT):**
-```bash
-# Install the connection package globally (one-time setup)
-npm install -g @mcp-abap-adt/connection
-
-# Generate .env file from service key JSON
-mcp-auth auth -k path/to/service-key.json
-```
-
-This will automatically create/update `.env` file with JWT tokens and connection details.
-
-**.env comments rule:** only full-line comments are supported (lines that start with `#`).  
-Inline comments are not parsed, so keep comments on separate lines.
-
-**Claude recommendation:** place the service key in the service-keys directory and use `--mcp=<destination>` (avoid manual JWT tokens).
-
-### Command-Line Options
-
-**Authentication:**
-- `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
-- `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser-auth-port=<port>` - Override OAuth browser callback port (default: 5000 for HTTP, 4000 for SSE, 4001 for stdio)
-- `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
-- `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
-
-When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
-
-**Examples:**
-```bash
-# Use auth-broker with file-based session storage (persists tokens)
-mcp-abap-adt --auth-broker --unsafe
-
-# Use auth-broker with in-memory session storage (default, secure)
-mcp-abap-adt --auth-broker
-
-# Custom path for service keys and sessions
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/ --unsafe
-```
-
-See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.
-
-### Handler logging switches
-- `AUTH_LOG_LEVEL=error|warn|info|debug` — sets base log level for handler logger; `DEBUG_AUTH_LOG=true` also enables `debug`.
-- `HANDLER_LOG_SILENT=true` — fully disables handler logging.
-- `DEBUG_CONNECTORS=true` — verbose connection logging in high-level handlers.
-- `DEBUG_HANDLERS=true` — enables verbose logs for selected read-only/system handlers.
-
-## Development
-
-### Testing
-```bash
-npm test
-```
-
-#### Test logging switches
-- `TEST_LOG_LEVEL=error|warn|info|debug` — controls test logger verbosity (DEBUG_TESTS/DEBUG_ADT_TESTS/DEBUG_CONNECTORS force `debug`).
-- `TEST_LOG_FILE=/tmp/adt-tests.log` — writes test logs to a file (best-effort).
-- `TEST_LOG_SILENT=true` — disables test logging pipeline (console output muted).
-- `TEST_LOG_COLOR=true` — adds colored/prefixed tags to test log lines.
-- All `console.*` in tests are routed through the test logger with a `[test]` prefix.
-
-### Building
-```bash
-npm run build
-```
-
-### Developer Tools
-```bash
-# Generate tool documentation
-npm run docs:tools
-
-# See tools/README.md for more developer utilities
-```
-
-## Contributors
-
-Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the complete list.
+The most consequential one silently misattributed query results to the wrong
+row. If you use `GetSqlQuery` or `GetTableContents` from the base project, that
+one is worth knowing about regardless of whether you adopt this fork — it has
+been submitted upstream as
+[PR #179](https://github.com/fr0ster/mcp-abap-adt/pull/179).
 
 ---
 
-**Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
+## Correctness fixes
+
+### Query results were misaligned across rows
+
+SAP emits an empty cell in the data preview payload as a **self-closing**
+`<dataPreview:data/>`. The regex-based parser did not match that form, so empty
+cells were dropped, the column's array came back short, and **every value below
+the first empty one moved up a row**.
+
+Reproducible with standard SAP tables on any system:
+
+```sql
+SELECT FIELDNAME, CHECKTABLE FROM DD03L WHERE TABNAME = 'E070'
+```
+
+Eight of the nine `CHECKTABLE` cells are empty. The one real value belongs to
+`STRKORR`, the last row, and was reported against `AS4USER`, the first.
+
+| | Before | After |
+|---|---|---|
+| `AS4USER` → `CHECKTABLE` | `"E070"` ❌ | `""` |
+| `STRKORR` → `CHECKTABLE` | `null` ❌ | `"E070"` |
+
+`GetTableContents` imports the same parser and was equally affected. Rewritten
+with `XMLParser`; empty strings and `"0"` are preserved rather than turned into
+`null`, NUMC keys keep their leading zeros, and duplicate column names in a JOIN
+get a suffix instead of overwriting one another.
+
+### Includes could not be written at all
+
+`UpdateProgram` addressed `/sap/bc/adt/programs/programs/`, which is the wrong
+ADT resource for an include. Lock, PUT and unlock all succeeded and **nothing
+was written**, while the tool reported success.
+
+There was no include write path anywhere: the ADT client library implements only
+the read half. This fork adds `UpdateInclude` (lock → PUT → unlock → read back
+and verify), and `UpdateProgram` now refuses an include instead of pretending.
+
+### "Success" was asserted, not verified
+
+Write tools inferred `success: true` from the absence of an exception, which is
+a different claim. Thirteen source-carrying `Update*` tools now read the object
+back and compare before reporting success.
+
+Objects edited through structured metadata rather than source — domains, data
+elements, message classes — are **not** covered. They are listed as unverified
+rather than quietly counted as passing.
+
+### Transport requests were silently created as LOCAL
+
+The client wrapped the target system in slashes (`tm:target="/QAS/"`), which SAP
+rejects, and passed the owner through in lowercase, which SAP does not
+recognise. The request was created as LOCAL and the tool reported the target
+that had been asked for. It now posts directly, uppercases the owner, and warns
+when SAP assigns a different target than requested.
+
+### Includes could not be activated
+
+The object-URI map had no entry for `PROG/I`, so activation fell through to a
+path that does not exist. Activating as `PROG` instead produced
+"REPORT/PROGRAM statement is missing". Activation success was also computed as
+`activated && checked`, which reports failure for an object that was already
+active and needed no work.
+
+### Running a class returned the previous version
+
+SAP executes the ACTIVE load. After an update without activation, the run
+returned the old version's output as though it were current. A pre-flight now
+compares the active and inactive sources and refuses with an explanation.
+
+---
+
+## New capabilities
+
+### Cross-system comparison
+
+Answers "has this reached QAS yet, and is it the same in production?" over a
+second read-only connection resolved from `sessions/<name>.env`.
+
+- `ListSystems` — which systems are reachable
+- `CompareObjectAcrossSystems` — unified diff for one object
+- `ComparePackageAcrossSystems` — a whole package against one target
+- `ComparePackageAcrossLandscape` — one call walks an ordered chain and reports
+  how far each object has travelled
+
+Two design notes. It compares **source, not version numbers** — ABAP version
+counters are per-system and unrelated across a landscape. And when a downstream
+system matches while an upstream one does not, that is reported as
+`out_of_band` rather than "promoted": it means something was changed outside the
+transport chain, which is precisely what you want surfaced.
+
+Function groups are expanded into their function modules and includes. Without
+that a typical custom package reports almost nothing, since a `FUGR` has no
+source of its own.
+
+### Objects too large for a tool call
+
+A 165 KB report cannot be passed as a tool argument, and reading one back
+consumes an enormous share of the context window. Since the server runs on the
+user's own machine, it can use the filesystem directly:
+
+```
+GetProgram    → to_file=/tmp/report.abap     (source to disk, summary returned)
+   edit the file
+UpdateProgram → source_path=/tmp/report.abap
+```
+
+`source_path` is available on 15 `Update*` tools; `to_file` on read-shaped
+tools. Both opt-in. A UTF-8 BOM is stripped on read — Windows editors add one,
+and a BOM before `REPORT` is a syntax error invisible in the editor that wrote
+it.
+
+### ABAP debugger
+
+`DebuggerSetBreakpoint`, `DebuggerListen`, `DebuggerGetStack`,
+`DebuggerGetVariable`, `DebuggerStep`, `DebuggerStop`,
+`DebuggerListBreakpoints`, `DebuggerDeleteBreakpoint`.
+
+**A breakpoint set in SAP GUI will not work.** It is a session breakpoint: the
+classic debugger handles it and ADT never sees it. Use
+`DebuggerSetBreakpoint`, and **trigger the code over HTTP or RFC** —
+`RuntimeRunProgram`, `RuntimeRunClass`, an OData service. A report started from
+SAP GUI goes to the classic debugger and the listener waits forever.
+
+### Transport release
+
+`ReleaseTransport`, so releasing no longer means leaving the tool for SE01. SAP
+answers `200` even for a request that does not exist, so success is taken from
+`tm:releasetimestamp` rather than the HTTP status.
+
+### abapGit
+
+`AbapGitListRepos`, `AbapGitGetRepo`, `AbapGitGetErrorLog`, `AbapGitLink`,
+`AbapGitPull`, `AbapGitUnlink`, wrapping the client already present in the
+dependency. **Untested**: the system this fork was developed against does not
+have the ADT abapGit component installed.
+
+---
+
+## Status
+
+| Area | State |
+|---|---|
+| Query parser | Fixed, unit tests, reproduced and verified live |
+| Includes | Verified live, end to end |
+| Write verification | Verified live (13 tools; DDIC metadata objects excluded) |
+| Transports | Create and release verified live |
+| Activation | Verified live |
+| Cross-system comparison | Verified live across three systems |
+| Local files | Verified live |
+| Debugger | Full cycle verified live |
+| abapGit | Compiles; component absent on the test system |
+
+426 unit tests, 43 integration tests.
+
+```bash
+npm test                  # unit
+npm run test:fira         # integration, needs tests/test-config.yaml
+```
+
+Integration tests run against a real system. Only the include suite writes, in
+`$TMP`, and cleans up afterwards.
+
+---
+
+## Known limitations
+
+- **`DebuggerListBreakpoints` always returns zero.** That endpoint's `GET` is
+  not a listing — the relation is *synchronize* and returns conflicts. Because a
+  set replaces the whole list and the current one cannot be read, setting a
+  breakpoint drops the others under the same IDE identity.
+- Debugger variables are returned as raw XML rather than parsed.
+- TLS verification is a process-wide setting, so a secondary system inherits
+  whatever the server was started with.
+- Package comparison is bounded by a safety cap. A large package expands to
+  thousands of comparable units; use `object_types` to narrow it.
+
+---
+
+## Relationship to the original
+
+This fork tracks `fr0ster/mcp-abap-adt` and aims to send fixes upstream rather
+than diverge. Fixes of general value are submitted as pull requests; the query
+parser fix is [PR #179](https://github.com/fr0ster/mcp-abap-adt/pull/179).
+
+For installation, configuration, transports, authentication and the full
+catalogue of the base tools, use the original project's documentation:
+[README.upstream.md](./README.upstream.md) and [docs/](./docs).

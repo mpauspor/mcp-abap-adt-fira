@@ -97,7 +97,7 @@ function toArray<T>(value: T | T[] | undefined): T[] {
  *    `<data></data>`. A parser that only recognises the open/close form drops
  *    those elements, the column's array comes back short, and every value
  *    below the first empty one shifts UP a row — silently attributing data to
- *    the wrong record. (Observed on DS4: `SELECT FIELDNAME, CHECKTABLE FROM
+ *    the wrong record. (Reproduced on a 7.5x system: `SELECT FIELDNAME, CHECKTABLE FROM
  *    DD03L WHERE TABNAME = 'E070'` has eight empty CHECKTABLE cells, and the
  *    single real value, which belongs to STRKORR, was reported against
  *    AS4USER.) Keeping the empty elements is what holds the rows in register.

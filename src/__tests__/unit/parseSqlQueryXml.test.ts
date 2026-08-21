@@ -1,7 +1,7 @@
 /**
  * Unit tests for the ADT data preview parser.
  *
- * The primary fixture is a VERBATIM capture from DS4 (client 100) of
+ * The primary fixture is a VERBATIM capture from a 7.5x system of
  *   SELECT FIELDNAME, CHECKTABLE FROM DD03L WHERE TABNAME = 'E070'
  * It is the minimal real payload that exhibits the alignment bug: eight of the
  * nine CHECKTABLE cells are empty, and SAP emits each of them as a
@@ -10,7 +10,7 @@
 
 import { parseSqlQueryXml } from '../../handlers/system/readonly/handleGetSqlQuery';
 
-/** Verbatim DS4 response — do not reformat; the self-closing <data/> elements are the point. */
+/** Verbatim server response — do not reformat; the self-closing <data/> elements are the point. */
 const DD03L_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?><dataPreview:tableData xmlns:dataPreview="http://www.sap.com/adt/dataPreview"><dataPreview:totalRows>9</dataPreview:totalRows><dataPreview:isHanaAnalyticalView>false</dataPreview:isHanaAnalyticalView><dataPreview:executedQueryString>SELECT FIELDNAME, CHECKTABLE FROM DD03L WHERE TABNAME = 'E070'   INTO     TABLE @DATA(LT_RESULT)   UP TO 15  ROWS   .</dataPreview:executedQueryString><dataPreview:queryExecutionTime>8.5520000</dataPreview:queryExecutionTime><dataPreview:columns><dataPreview:metadata dataPreview:name="FIELDNAME" dataPreview:type="C" dataPreview:description="FIELDNAME" dataPreview:keyAttribute="false" dataPreview:colType="" dataPreview:isKeyFigure="false"/><dataPreview:dataSet><dataPreview:data>AS4USER</dataPreview:data><dataPreview:data>AS4DATE</dataPreview:data><dataPreview:data>AS4TIME</dataPreview:data><dataPreview:data>TRKORR</dataPreview:data><dataPreview:data>TRFUNCTION</dataPreview:data><dataPreview:data>KORRDEV</dataPreview:data><dataPreview:data>TRSTATUS</dataPreview:data><dataPreview:data>TARSYSTEM</dataPreview:data><dataPreview:data>STRKORR</dataPreview:data></dataPreview:dataSet></dataPreview:columns><dataPreview:columns><dataPreview:metadata dataPreview:name="CHECKTABLE" dataPreview:type="C" dataPreview:description="CHECKTABLE" dataPreview:keyAttribute="false" dataPreview:colType="" dataPreview:isKeyFigure="false"/><dataPreview:dataSet><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data/><dataPreview:data>E070</dataPreview:data></dataPreview:dataSet></dataPreview:columns></dataPreview:tableData>`;
 
 function buildPayload(
@@ -33,7 +33,7 @@ function buildPayload(
 }
 
 describe('parseSqlQueryXml', () => {
-  describe('row alignment with empty cells (DS4 regression)', () => {
+  describe('row alignment with empty cells', () => {
     const result = parseSqlQueryXml(DD03L_PAYLOAD, 'SELECT ...', 15);
 
     it('returns every row', () => {

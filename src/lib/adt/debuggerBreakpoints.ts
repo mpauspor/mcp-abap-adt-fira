@@ -2,13 +2,13 @@
  * External ABAP breakpoints over ADT.
  *
  * Needed because a breakpoint set in SAP GUI is a SESSION breakpoint: it opens
- * the classic GUI debugger and is invisible to an ADT listener. Verified on
- * DS4 — after setting one in SE38, `GET /sap/bc/adt/debugger/breakpoints`
+ * the classic GUI debugger and is invisible to an ADT listener. Verified on a
+ * 7.5x system — after setting one in SE38, `GET /sap/bc/adt/debugger/breakpoints`
  * returned empty. Only a breakpoint registered through ADT, under the same
  * ideId as the listener, can be caught by `DebuggerListen`.
  *
  * The payload shape was not documented anywhere reachable. It was recovered by
- * probing DS4 — a wrong root element makes SAP name the expected one, and a
+ * probing a live system — a wrong root element makes SAP name the expected one, and a
  * missing attribute is named too — and finished against the open-source
  * `abap-adt-api`, which supplied the one piece probing could not: SAP names
  * missing ATTRIBUTES but not missing ELEMENTS, and what was missing was the

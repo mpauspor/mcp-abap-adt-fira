@@ -1,8 +1,8 @@
 /**
  * Moving source in and out of the conversation via local files.
  *
- * The MCP call itself is the size ceiling: a 165 KB program (Z_DETALLADO_NEW on
- * DS4 is exactly that) cannot be passed as a tool argument, and reading one back
+ * The MCP call itself is the size ceiling: a 165 KB report (measured; such
+ * one real report was exactly that) cannot be passed as a tool argument, and reading one back
  * consumes an enormous share of the context window for text nobody wants to
  * read inline.
  *

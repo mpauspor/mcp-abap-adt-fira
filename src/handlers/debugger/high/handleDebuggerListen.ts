@@ -81,7 +81,8 @@ export async function handleDebuggerListen(
 
     // NOT AbapDebugger.launch(): that issues a GET, and a GET against
     // /debugger/listeners returns 200 with an empty body in under half a
-    // second — it never waits, so nothing is ever caught. Measured on DS4:
+    // second — it never waits, so nothing is ever caught. Measured on a 7.5x
+    // system:
     // GET returns in 0.3-0.5s regardless of the timeout parameter, while POST
     // holds the connection open. POST is the long-poll.
     const query = new URLSearchParams({

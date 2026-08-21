@@ -570,6 +570,7 @@ import {
   withOutputToFile,
   withSourceFromFile,
 } from '../../fileTransfer.js';
+import { withMetadataVerification } from '../../metadataVerification.js';
 import {
   SOURCE_WRITE_TOOLS,
   withWriteVerification,
@@ -1289,7 +1290,20 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       ),
     }));
 
-    return verified.map((entry) =>
+    // Objects edited as structured metadata cannot be byte-compared, so they
+    // are checked a different way: SAP's own change timestamp must move.
+    // No-op for tools absent from METADATA_WRITE_TOOLS.
+    const metadataVerified = verified.map((entry) => ({
+      ...entry,
+      handler: withMetadataVerification(
+        entry.toolDefinition.name,
+        entry.handler,
+        () => this.context,
+        () => this.context.logger,
+      ),
+    }));
+
+    return metadataVerified.map((entry) =>
       isMutatingToolName(entry.toolDefinition.name)
         ? {
             ...entry,

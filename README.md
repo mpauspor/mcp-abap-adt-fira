@@ -72,8 +72,15 @@ a different claim. Thirteen source-carrying `Update*` tools now read the object
 back and compare before reporting success.
 
 Objects edited through structured metadata rather than source — domains, data
-elements, message classes — are **not** covered. They are listed as unverified
-rather than quietly counted as passing.
+elements, message classes, function groups, service bindings — cannot be
+byte-compared, since SAP generates their payload. They are checked a different
+way: four of the five accept a `description`, which is read back and compared,
+so the check confirms the value that landed. `UpdateServiceBinding` writes no
+comparable field, so it is verified by SAP's change timestamp advancing.
+
+A read that fails is reported as unverified rather than as an error, since a
+read problem is not a write problem. Only positive evidence — a value that came
+back different, or a timestamp that never moved — fails the call.
 
 ### Transport requests were silently created as LOCAL
 
@@ -145,6 +152,12 @@ it.
 `DebuggerGetVariable`, `DebuggerStep`, `DebuggerStop`,
 `DebuggerListBreakpoints`, `DebuggerDeleteBreakpoint`.
 
+Multiple breakpoints coexist: a `POST` to that endpoint replaces the entire set
+for an IDE identity, and its `GET` is a *synchronize* relation that returns
+conflicts rather than a listing, so the current set cannot be read back. The
+server keeps its own registry and re-sends the full set on every change.
+Variables come back parsed — name, value, type, length — rather than as raw XML.
+
 **A breakpoint set in SAP GUI will not work.** It is a session breakpoint: the
 classic debugger handles it and ADT never sees it. Use
 `DebuggerSetBreakpoint`, and **trigger the code over HTTP or RFC** —
@@ -172,7 +185,7 @@ have the ADT abapGit component installed.
 |---|---|
 | Query parser | Fixed, unit tests, reproduced and verified live |
 | Includes | Verified live, end to end |
-| Write verification | Verified live (13 tools; DDIC metadata objects excluded) |
+| Write verification | Verified live (13 source tools + 5 metadata tools) |
 | Transports | Create and release verified live |
 | Activation | Verified live |
 | Cross-system comparison | Verified live across three systems |
@@ -180,7 +193,7 @@ have the ADT abapGit component installed.
 | Debugger | Full cycle verified live |
 | abapGit | Compiles; component absent on the test system |
 
-426 unit tests, 43 integration tests.
+557 unit tests, 43 integration tests.
 
 ```bash
 npm test                  # unit
@@ -194,11 +207,6 @@ Integration tests run against a real system. Only the include suite writes, in
 
 ## Known limitations
 
-- **`DebuggerListBreakpoints` always returns zero.** That endpoint's `GET` is
-  not a listing — the relation is *synchronize* and returns conflicts. Because a
-  set replaces the whole list and the current one cannot be read, setting a
-  breakpoint drops the others under the same IDE identity.
-- Debugger variables are returned as raw XML rather than parsed.
 - TLS verification is a process-wide setting, so a secondary system inherits
   whatever the server was started with.
 - Package comparison is bounded by a safety cap. A large package expands to

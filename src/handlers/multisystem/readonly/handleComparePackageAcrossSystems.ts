@@ -99,6 +99,9 @@ const DIRECT_SOURCE_TYPES = new Set([
   'DDLS',
   'TABL/DT',
   'TABL',
+  // A package lists structures as TABL/DS, not STRU/DS. Omitting it skipped
+  // 165 structures in ZSD alone — they read fine from /ddic/structures/.
+  'TABL/DS',
   'STRU/DS',
   'STRU',
   'BDEF/BDO',

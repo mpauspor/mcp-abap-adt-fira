@@ -29,6 +29,7 @@ import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { resolveEnvFilePath } from '../config/envResolver';
 import { getPlatformPaths } from '../stores/platformPaths';
+import { getSystemContext } from '../systemContext';
 import { makeAdtRequestWithTimeout } from '../utils';
 
 export interface SecondarySystemInfo {
@@ -111,14 +112,44 @@ export function listAvailableSystems(): SecondarySystemInfo[] {
   return systems.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** Connection metadata for the system the server itself is running against. */
-export function currentSystemInfo(): Record<string, string | undefined> {
+/**
+ * Connection metadata for the system the server itself is running against.
+ *
+ * Deliberately does NOT trust `process.env`. When the server is started with
+ * `--env-path`, only some variables reach the process environment —
+ * SAP_MASTER_SYSTEM and SAP_CLIENT arrive, SAP_URL does not — so reading the
+ * environment reported a current system with no URL while every secondary
+ * system showed one. The live connection is the authoritative source; the
+ * environment is only a last resort.
+ *
+ * `getBaseUrl()` is on the IAbapConnection interface. `getConfig()` is not — it
+ * exists on the concrete connection classes — so it is feature-detected rather
+ * than assumed.
+ */
+export async function currentSystemInfo(
+  connection?: IAbapConnection,
+): Promise<Record<string, string | undefined>> {
+  const context = getSystemContext();
+  const config: any = connection
+    ? (connection as any).getConfig?.()
+    : undefined;
+
+  let url: string | undefined = config?.url;
+  if (!url && connection?.getBaseUrl) {
+    try {
+      url = await connection.getBaseUrl();
+    } catch {
+      /* a connection that cannot report its URL is not a failure to list */
+    }
+  }
+
   return {
-    url: process.env.SAP_URL,
-    client: process.env.SAP_CLIENT,
-    system_id: process.env.SAP_MASTER_SYSTEM,
+    url: url ?? process.env.SAP_URL,
+    client: config?.client ?? context.client ?? process.env.SAP_CLIENT,
+    system_id: context.masterSystem ?? process.env.SAP_MASTER_SYSTEM,
     system_type: process.env.SAP_SYSTEM_TYPE,
-    auth_type: process.env.SAP_AUTH_TYPE,
+    auth_type: config?.authType ?? process.env.SAP_AUTH_TYPE,
+    user: config?.username ?? context.responsible ?? process.env.SAP_USERNAME,
   };
 }
 

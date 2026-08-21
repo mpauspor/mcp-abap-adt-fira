@@ -28,7 +28,7 @@ export async function handleListSystems(
   context: HandlerContext,
   _args: unknown,
 ) {
-  const { logger } = context;
+  const { connection, logger } = context;
   try {
     const systems = listAvailableSystems();
     const directories = sessionsDirectories();
@@ -43,7 +43,7 @@ export async function handleListSystems(
       data: JSON.stringify(
         {
           success: true,
-          current_system: currentSystemInfo(),
+          current_system: await currentSystemInfo(connection),
           comparison_systems: systems,
           count: systems.length,
           sessions_directories: directories,

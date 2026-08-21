@@ -8,8 +8,8 @@
  */
 
 import {
+  deleteAllBreakpoints,
   deleteBreakpoint,
-  syncBreakpoints,
 } from '../../../lib/adt/debuggerBreakpoints';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
@@ -41,14 +41,15 @@ export async function handleDebuggerDeleteBreakpoint(
   const { connection, logger } = context;
   try {
     if (args?.all === true) {
-      const remaining = await syncBreakpoints(connection, [], logger);
+      await deleteAllBreakpoints(connection, logger);
       return return_response({
         data: JSON.stringify(
           {
             success: true,
             removed: 'all',
-            remaining: remaining.length,
-            message: 'All external breakpoints removed.',
+            remaining: 0,
+            message:
+              'All external breakpoints removed, including any left by an earlier run of this server.',
           },
           null,
           2,

@@ -73,41 +73,46 @@ export function parseBreakpoints(xml: string): AbapBreakpoint[] {
   }));
 }
 
-/** Identity query string SAP needs to know WHOSE breakpoints are meant. */
-function identityQuery(): string {
-  const identity = getDebuggerIdentity();
-  return new URLSearchParams({
-    scope: 'external',
-    debuggingMode: 'user',
-    requestUser: getDebuggerUser() ?? '',
-    terminalId: identity.terminalId,
-    ideId: identity.ideId,
-  }).toString();
+/**
+ * What THIS server has registered, keyed by source URI.
+ *
+ * SAP offers no way to read the set back: `GET /sap/bc/adt/debugger/breakpoints`
+ * answers empty however it is called — with and without identity parameters,
+ * and immediately after a successful POST. Its relation is *synchronize*, and
+ * it returns conflicts, not a listing.
+ *
+ * That matters because `syncScope mode="full"` makes every POST the complete
+ * new set: anything omitted is deleted. Without a record of what is already
+ * there, setting a second breakpoint silently removes the first — which is
+ * exactly what happened before this registry existed.
+ *
+ * The registry is refreshed from each POST response, which IS authoritative:
+ * SAP echoes back the set it now holds.
+ *
+ * Two limits, both real. It is process-local, so breakpoints registered by an
+ * earlier run of this server are invisible to it — `deleteAllBreakpoints()`
+ * clears those regardless, since an empty sync wipes the set whatever the
+ * registry believes. And it cannot see breakpoints set by another IDE, though
+ * those live under a different ideId and are not affected by our syncs.
+ */
+const registry = new Map<string, AbapBreakpoint>();
+
+/** Refresh the registry from a POST response, which reflects reality. */
+function adoptServerState(breakpoints: AbapBreakpoint[]): AbapBreakpoint[] {
+  registry.clear();
+  for (const breakpoint of breakpoints) {
+    if (breakpoint.uri) registry.set(breakpoint.uri, breakpoint);
+  }
+  return breakpoints;
 }
 
 /**
- * Read the breakpoints currently registered for this IDE identity.
+ * The breakpoints this server has registered.
  *
- * The identity parameters are not optional. Without them SAP answers with an
- * empty list rather than an error, and an empty list is indistinguishable from
- * "none set" — which made `addBreakpoint` believe there was nothing to keep and
- * delete the previous breakpoint on every call.
+ * Deliberately NOT a call to SAP: that endpoint cannot answer the question.
  */
-export async function listBreakpoints(
-  connection: IAbapConnection,
-): Promise<AbapBreakpoint[]> {
-  const response = await makeAdtRequestWithTimeout(
-    connection,
-    `${BREAKPOINTS_URL}?${identityQuery()}`,
-    'GET',
-    'default',
-    undefined,
-    undefined,
-    { Accept: 'application/xml' },
-  );
-  return parseBreakpoints(
-    typeof response.data === 'string' ? response.data : '',
-  );
+export function listBreakpoints(): AbapBreakpoint[] {
+  return [...registry.values()];
 }
 
 function renderBreakpoint(breakpoint: AbapBreakpoint): string {
@@ -173,16 +178,16 @@ export async function addBreakpoint(
   breakpoint: AbapBreakpoint,
   logger?: ILogger,
 ): Promise<{ all: AbapBreakpoint[]; added: AbapBreakpoint | undefined }> {
-  const existing = await listBreakpoints(connection);
+  // Re-setting the same position replaces it rather than duplicating it.
+  const kept = [...registry.values()].filter(
+    (entry) => entry.uri !== breakpoint.uri,
+  );
 
-  // Re-setting the same position is a no-op, not a duplicate.
-  const kept = existing.filter((entry) => entry.uri !== breakpoint.uri);
-  const all = await syncBreakpoints(connection, [...kept, breakpoint], logger);
+  const all = adoptServerState(
+    await syncBreakpoints(connection, [...kept, breakpoint], logger),
+  );
 
-  return {
-    all,
-    added: all.find((entry) => entry.uri === breakpoint.uri),
-  };
+  return { all, added: all.find((entry) => entry.uri === breakpoint.uri) };
 }
 
 /** Remove one breakpoint by the id SAP assigned it. */
@@ -191,17 +196,31 @@ export async function deleteBreakpoint(
   breakpointId: string,
   logger?: ILogger,
 ): Promise<AbapBreakpoint[]> {
-  const existing = await listBreakpoints(connection);
+  const existing = [...registry.values()];
   const remaining = existing.filter((entry) => entry.id !== breakpointId);
 
   if (remaining.length === existing.length) {
     throw new Error(
-      `No breakpoint with id "${breakpointId}" is registered. Use DebuggerListBreakpoints to see the current set.`,
+      `No breakpoint with id "${breakpointId}" is registered by this server. Use DebuggerListBreakpoints to see the current set, or delete them all with all=true.`,
     );
   }
 
   logger?.info(`Removing breakpoint ${breakpointId}`);
-  return syncBreakpoints(connection, remaining, logger);
+  return adoptServerState(await syncBreakpoints(connection, remaining, logger));
+}
+
+/**
+ * Clear every breakpoint under this IDE identity.
+ *
+ * An empty sync wipes the set on the server whatever the registry believes, so
+ * this also recovers from breakpoints left behind by an earlier server run.
+ */
+export async function deleteAllBreakpoints(
+  connection: IAbapConnection,
+  logger?: ILogger,
+): Promise<void> {
+  await syncBreakpoints(connection, [], logger);
+  registry.clear();
 }
 
 /**

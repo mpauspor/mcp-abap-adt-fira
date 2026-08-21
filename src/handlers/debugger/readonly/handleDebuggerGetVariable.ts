@@ -9,6 +9,7 @@
 import {
   getChildVariables,
   getVariables,
+  parseVariables,
 } from '../../../lib/adt/debuggerSession';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
@@ -59,9 +60,11 @@ export async function handleDebuggerGetVariable(
       .filter(Boolean);
 
     const listing = names.length === 0;
-    const data = listing
+    const raw = listing
       ? await getChildVariables(connection, [args?.parent || '@ROOT'])
       : await getVariables(connection, names);
+
+    const { variables, children } = parseVariables(raw);
 
     logger?.debug(
       listing
@@ -76,7 +79,14 @@ export async function handleDebuggerGetVariable(
           mode: listing ? 'list' : 'read',
           requested: listing ? undefined : names,
           parent: listing ? args?.parent || '@ROOT' : undefined,
-          variables: data,
+          count: variables.length,
+          variables,
+          // Structures and tables expose their components as children; pass a
+          // childId back as `parent` to drill in.
+          children: children.length > 0 ? children : undefined,
+          hint: variables.some((v) => v.incomplete)
+            ? 'Some values are truncated by SAP. Drill in with parent=<name> to read them fully.'
+            : undefined,
         },
         null,
         2,

@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'DebuggerListBreakpoints',
   available_in: ['onprem'] as const,
   description:
-    '[debugger] List the external breakpoints registered for this IDE identity, with the id needed to delete one. Breakpoints set in SAP GUI do not appear here — they are session breakpoints and ADT cannot see them.',
+    '[debugger] List the external breakpoints this server has registered, with the id needed to delete one. Two things it cannot show: breakpoints set in SAP GUI (those are session breakpoints ADT cannot see) and breakpoints left by an earlier run of this server — SAP offers no way to read the set back. DebuggerDeleteBreakpoint with all=true clears those regardless.',
   inputSchema: { type: 'object', properties: {} },
 } as const;
 
@@ -21,9 +21,9 @@ export async function handleDebuggerListBreakpoints(
   context: HandlerContext,
   _args: unknown,
 ) {
-  const { connection, logger } = context;
+  const { logger } = context;
   try {
-    const breakpoints = await listBreakpoints(connection);
+    const breakpoints = listBreakpoints();
     const identity = getDebuggerIdentity();
 
     return return_response({
@@ -35,7 +35,7 @@ export async function handleDebuggerListBreakpoints(
           breakpoints,
           message:
             breakpoints.length === 0
-              ? 'No external breakpoints are registered. Use DebuggerSetBreakpoint before DebuggerListen, or the listener will never fire.'
+              ? 'This server has no breakpoints registered. Use DebuggerSetBreakpoint before DebuggerListen, or the listener will never fire.'
               : `${breakpoints.length} breakpoint(s) registered.`,
         },
         null,

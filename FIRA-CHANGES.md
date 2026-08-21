@@ -579,3 +579,59 @@ UpdateProgram → source_path=C:	mp\z_det.abap
 ```
 
 ✅ Probado de extremo a extremo contra DS4, incluidas las cuatro salvaguardas.
+
+---
+
+# Sexta tanda: tests de integración
+
+Las 17 herramientas nuevas tenían **cero** cobertura de integración. Ahora
+`npm run test:fira` las ejercita contra el paisaje real.
+
+**Nuevo:** `src/__tests__/integration/fira/` (4 suites) y
+`helpers/firaContext.ts`.
+
+| Suite | Cubre |
+|---|---|
+| `multisystem` | ListSystems y las tres herramientas de comparación |
+| `fileTransfer` | `source_path`, `to_file` y las cuatro salvaguardas |
+| `includeLifecycle` | Escritura real de includes + la guarda de `UpdateProgram` |
+| `toolContracts` | Transportes, depurador y abapGit: guardas y refusals |
+
+## Por qué un helper propio y no `LambdaTester`
+
+El arnés del repo conduce cada test desde un bloque por caso en
+`test-config.yaml` — lo correcto para las suites de ciclo de vida de objetos
+para las que se construyó. Las herramientas de este fork son casi todas de
+lectura y toman sus entradas del paisaje, no de fixtures: añadir quince bloques
+de configuración habría sumado ceremonia sin sumar cobertura. `firaContext.ts`
+usa la misma carga de config y de entorno, así que un único `test-config.yaml`
+sigue gobernándolo todo.
+
+## Qué se afirma, y qué deliberadamente no
+
+**No se fija el contenido de ninguna comparación.** Si `ZSD` está hoy
+sincronizado con QS4 es un hecho sobre los transportes de Fira, no sobre este
+código: un test que lo afirmara se pondría rojo cada vez que alguien libera algo,
+y un test que se pone rojo por motivos ajenos enseña al equipo a ignorar los
+rojos.
+
+Se afirma el **contrato**: que un veredicto es uno de los valores conocidos, que
+la ausencia se reporta como ausencia y no como error, que un sistema inalcanzable
+falla ruidosamente, y que nada se descarta en silencio.
+
+## Caminos que no se ejercitan, y por qué
+
+Liberar una orden es irreversible y la mete en la cola de importación; capturar
+un debuggee requiere que alguien dispare código a mano; abapGit necesita un
+componente que DS4 no tiene. De esos se prueban las **guardas**: las negativas y
+la calidad del mensaje cuando la respuesta es "no".
+
+No es un premio de consolación. Cada una de esas rutas existe porque el original
+devolvía algo engañoso, y una negativa equivocada cuesta tanto tiempo a un
+desarrollador como un éxito equivocado.
+
+## Escrituras en SAP
+
+Solo `includeLifecycle` escribe. Crea `ZZFIRA_T_INC` en `$TMP` y lo borra en
+`afterAll`, también tras un fallo — un include bloqueado y huérfano bloquearía la
+siguiente ejecución.

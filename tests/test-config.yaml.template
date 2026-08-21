@@ -108,6 +108,13 @@ environment:
 # Objects are lazily created on first ensureSharedDependency() call, never deleted.
 # Manage with: npm run shared:setup / shared:teardown / shared:check
 
+# ============================================================================
+# FIRA — herramientas añadidas en este fork
+# ============================================================================
+fira:
+  comparison_system: ""   # ← CHANGE: name from ListSystems, or "" to skip cross-system tests
+  comparison_package: "ZSD"                  # paquete usado en los barridos de solo lectura
+
 shared_dependencies:
   package: "ZMCP_SHARED"                   # ← CHANGE: package for shared test objects
   super_package: ""                          # super package (optional, leave "" if none)

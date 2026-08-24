@@ -164,6 +164,25 @@ classic debugger handles it and ADT never sees it. Use
 `RuntimeRunProgram`, `RuntimeRunClass`, an OData service. A report started from
 SAP GUI goes to the classic debugger and the listener waits forever.
 
+### ABAP Test Cockpit
+
+`RunAtcCheck` runs the checks a transport is actually judged by, rather than the
+syntax check `CheckProgram` and friends perform. A package works as an object
+set, so scanning one is a single call.
+
+The output leads with shape, not detail: counts by priority, the checks
+responsible, and the worst objects — a single legacy program produced 35
+findings on the system this was built against, and a package produces
+thousands. Findings carry the include and line they really sit in, which is
+frequently not the object that was scanned, and whether ATC offers an automatic
+fix, a manual one, or only a pseudo-comment.
+
+Two results that would otherwise read as "clean" are refused instead. ATC
+answers an unknown or uncheckable object with an empty worklist, so zero
+objects analysed is reported as an error rather than as passing. And a run that
+hits a limit is flagged through `objectSetIsComplete`, which is the only thing
+distinguishing a truncated run from a clean one.
+
 ### Transport release
 
 `ReleaseTransport`, so releasing no longer means leaving the tool for SE01. SAP
@@ -191,9 +210,10 @@ have the ADT abapGit component installed.
 | Cross-system comparison | Verified live across three systems |
 | Local files | Verified live |
 | Debugger | Full cycle verified live |
+| ATC | Verified live — real findings on a real package |
 | abapGit | Compiles; component absent on the test system |
 
-557 unit tests, 43 integration tests.
+571 unit tests, 43 integration tests.
 
 ```bash
 npm test                  # unit

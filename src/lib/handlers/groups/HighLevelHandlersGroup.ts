@@ -13,6 +13,10 @@ import {
   handleAbapGitUnlink,
 } from '../../../handlers/abapgit/high/handleAbapGitUnlink';
 import {
+  handleRunAtcCheck,
+  RunAtcCheckToolDefinition as RunAtcCheck_Tool,
+} from '../../../handlers/atc/high/handleRunAtcCheck';
+import {
   TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
   handleCheckBehaviorDefinition,
 } from '../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
@@ -1092,6 +1096,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReleaseTransport_Tool,
         handler: withContext(handleReleaseTransport),
+      },
+      // ABAP Test Cockpit — the checks a transport is judged by
+      {
+        toolDefinition: RunAtcCheck_Tool,
+        handler: withContext(handleRunAtcCheck),
       },
       // abapGit (ADT-integrated)
       {

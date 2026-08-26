@@ -2,7 +2,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error } from '../../../lib/utils';
+import { return_error, SQL_MAX_LENGTH } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
@@ -269,6 +269,12 @@ function hintForSapError(
   message: string,
   sqlQuery: string,
 ): string | undefined {
+  if (/only one select statement/i.test(message)) {
+    return sqlQuery.length > SQL_MAX_LENGTH
+      ? `Your statement is ${sqlQuery.length} characters. SAP's data preview accepts at most ${SQL_MAX_LENGTH}, and reports anything longer with this misleading message — the syntax is fine. Shorten it: fewer columns, fewer spaces, or split the query.`
+      : 'SAP read the statement as more than one SELECT. Check for a stray period, which ends the statement early.';
+  }
+
   if (!/invalid here|due to grammar/i.test(message)) return undefined;
 
   if (/\bINTO\b/i.test(sqlQuery)) {

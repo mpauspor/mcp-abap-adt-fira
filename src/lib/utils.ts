@@ -94,6 +94,15 @@ export { getTimeout, getTimeoutConfig, logger };
  * Encodes SAP object names for use in URLs.
  * Mirrors @mcp-abap-adt/adt-clients internal util but avoids unstable exports.
  */
+/**
+ * The ADT data preview accepts at most 255 characters of SQL.
+ *
+ * Measured by bisection against a live system: 255 succeeds, 256 fails. SAP
+ * answers anything longer with "Only one SELECT statement is allowed", which
+ * sends you hunting for a syntax error that is not there.
+ */
+export const SQL_MAX_LENGTH = 255;
+
 export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }

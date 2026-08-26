@@ -200,6 +200,13 @@ rather than a blocker because it is often deliberate.
 The judgement is a pure function over the transport tables, so every rule is
 unit tested — including cases that are awkward to stage on a real system.
 
+Two things about the transport tables that only real data reveals. `E070` holds
+far more than requests: on the system this was developed against, SAP's own
+piece lists (`TRFUNCTION = 'F'`) accounted for 107,409 of the 108,255 modifiable
+object entries against 846 in genuine requests and tasks, so searching every
+modifiable header returns almost nothing but noise. And objects belong to the
+tasks under a request, not to the request itself, so both have to be read.
+
 ### Transport release
 
 `ReleaseTransport`, so releasing no longer means leaving the tool for SE01. SAP
@@ -228,10 +235,10 @@ have the ADT abapGit component installed.
 | Local files | Verified live |
 | Debugger | Full cycle verified live |
 | ATC | Verified live — real findings on a real package |
-| Transport pre-release check | Logic unit tested; **not yet run against a live system** |
+| Transport pre-release check | Verified live, including a real cross-request overlap |
 | abapGit | Compiles; component absent on the test system |
 
-583 unit tests, 43 integration tests.
+588 unit tests, 43 integration tests.
 
 ```bash
 npm test                  # unit
@@ -245,6 +252,10 @@ Integration tests run against a real system. Only the include suite writes, in
 
 ## Known limitations
 
+- **The data preview accepts at most 255 characters of SQL.** Measured by
+  bisection: 255 succeeds, 256 fails. SAP reports anything longer as "Only one
+  SELECT statement is allowed", which reads like a syntax error and is not one.
+  `GetSqlQuery` now says so when the statement is over the limit.
 - TLS verification is a process-wide setting, so a secondary system inherits
   whatever the server was started with.
 - Package comparison is bounded by a safety cap. A large package expands to

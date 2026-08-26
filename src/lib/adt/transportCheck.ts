@@ -17,6 +17,7 @@
  */
 
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import { SQL_MAX_LENGTH } from '../utils';
 
 /** E070-TRSTATUS. Anything not modifiable can no longer be changed. */
 export const MODIFIABLE_STATUSES = new Set(['D', 'L']);
@@ -31,6 +32,31 @@ const REQUEST_FUNCTIONS = new Set([
   WORKBENCH_REQUEST,
   CUSTOMIZING_REQUEST,
   TRANSPORT_OF_COPIES,
+]);
+
+/**
+ * Functions that represent work somebody releases — requests, tasks and
+ * relocations.
+ *
+ * `E070` also holds entries a developer never releases, above all `F`, the
+ * piece lists SAP keeps for its own purposes. On the system this was built
+ * against those account for 508 of the 622 modifiable headers and 107,409 of
+ * the 108,255 modifiable object entries, against 846 in real requests and
+ * tasks. Searching for an object across every modifiable header therefore
+ * reports almost nothing but noise, which only showed up against real data.
+ */
+export const RELEASABLE_FUNCTIONS = new Set([
+  'K', // workbench request
+  'W', // customizing request
+  'T', // transport of copies
+  'S', // development/correction task
+  'R', // repair task
+  'Q', // customizing task
+  'X', // unclassified task
+  'Y', // unclassified request
+  'C', // relocation of objects
+  'O', // relocation of a complete package
+  'E', // relocation without package change
 ]);
 
 export interface TransportHeader {
@@ -193,10 +219,15 @@ export function analyseTransport(
   // in two open requests. Releasing one takes a partial version.
   if (data.elsewhere.length > 0) {
     const others = [...new Set(data.elsewhere.map((o) => o.otherTrkorr))];
+    // Count distinct objects, not rows. One object in five other requests is
+    // five rows, and reporting that as "5 objects" overstates the problem —
+    // visibly so when the transport holds fewer objects than that.
+    const affected = new Set(data.elsewhere.map((o) => `${o.type} ${o.name}`));
+    const plural = affected.size === 1 ? '' : 's';
     findings.push({
       severity: 'warning',
       code: 'objects_in_other_requests',
-      message: `${data.elsewhere.length} object${data.elsewhere.length === 1 ? '' : 's'} in this transport also sit in ${others.length} other open request${others.length === 1 ? '' : 's'}. Releasing this one alone moves a partial version of ${data.elsewhere.length === 1 ? 'that object' : 'those objects'}.`,
+      message: `${affected.size} of the ${data.objects.length} object${data.objects.length === 1 ? '' : 's'} in this transport also sit${affected.size === 1 ? 's' : ''} in ${others.length} other open request${others.length === 1 ? '' : 's'} (${data.elsewhere.length} placement${data.elsewhere.length === 1 ? '' : 's'}). Releasing this one alone moves a partial version of ${affected.size === 1 ? 'that object' : `those object${plural}`}.`,
       detail: data.elsewhere.map((o) => ({
         object: `${o.pgmid} ${o.type} ${o.name}`,
         also_in: o.otherTrkorr,
@@ -268,17 +299,20 @@ export async function gatherTransportData(
   const header = headers.length ? rowToHeader(headers[0]) : undefined;
   if (!header) return { tasks: [], objects: [], elsewhere: [] };
 
-  const [taskRows, objectRows] = await Promise.all([
-    readRows(
-      `SELECT TRKORR, TRFUNCTION, TRSTATUS, TARSYSTEM, AS4USER, STRKORR FROM E070 WHERE STRKORR = '${trkorr}'`,
-      200,
-    ),
-    // Objects live on the tasks, not on the request, so both are queried.
-    readRows(
-      `SELECT e~TRKORR, e~PGMID, e~OBJECT, e~OBJ_NAME FROM E071 AS e INNER JOIN E070 AS h ON h~TRKORR = e~TRKORR WHERE h~TRKORR = '${trkorr}' OR h~STRKORR = '${trkorr}'`,
-      maxObjects,
-    ),
-  ]);
+  // Sequential, not Promise.all. Two data-preview queries in flight on one
+  // connection make SAP answer "Only one SELECT statement is allowed" — the
+  // session serialises them, and the parallel version failed on every real
+  // transport while still passing for one that did not exist, because that
+  // path returns before the second query is ever sent.
+  const taskRows = await readRows(
+    `SELECT TRKORR, TRFUNCTION, TRSTATUS, TARSYSTEM, AS4USER, STRKORR FROM E070 WHERE STRKORR = '${trkorr}'`,
+    200,
+  );
+  // Objects live on the tasks, not on the request, so both are queried.
+  const objectRows = await readRows(
+    `SELECT e~TRKORR, e~PGMID, e~OBJECT, e~OBJ_NAME FROM E071 AS e INNER JOIN E070 AS h ON h~TRKORR = e~TRKORR WHERE h~TRKORR = '${trkorr}' OR h~STRKORR = '${trkorr}'`,
+    maxObjects,
+  );
 
   const tasks = taskRows.map(rowToHeader);
   const objects: TransportObject[] = objectRows.map((row) => ({
@@ -296,62 +330,122 @@ export async function gatherTransportData(
 }
 
 /**
+ * Pack literals into IN-lists that keep the whole statement within SAP's limit.
+ *
+ * A fixed batch size cannot work: the data preview caps SQL at 255 characters,
+ * and object names vary from a few characters to forty. Batching by count
+ * produced statements SAP rejected with a message about SELECT statements that
+ * had nothing to do with the real problem.
+ */
+export function batchByLength(
+  values: string[],
+  fixedLength: number,
+  limit: number = SQL_MAX_LENGTH,
+): string[][] {
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let used = fixedLength;
+
+  for (const value of values) {
+    // "'value', "
+    const cost = value.length + 4;
+    if (current.length > 0 && used + cost > limit) {
+      batches.push(current);
+      current = [];
+      used = fixedLength;
+    }
+    current.push(value);
+    used += cost;
+  }
+  if (current.length) batches.push(current);
+  return batches;
+}
+
+const quote = (values: string[]) => values.map((v) => `'${v}'`).join(', ');
+
+/**
  * Find the transport's objects in other requests that are still open.
  *
- * Queried by object name in batches rather than one statement per object: a
- * transport with hundreds of objects would otherwise mean hundreds of round
- * trips. Requests belonging to this transport's own task tree are excluded, or
- * every object would report itself.
+ * Done in two steps rather than one join. A single statement carrying the
+ * object names, the status filter and the function filter does not fit in 255
+ * characters once more than one or two names are involved, so the names are
+ * matched first and the owning headers fetched afterwards. Status and function
+ * are then filtered in code, where the rule is visible and testable.
  */
 async function findObjectsElsewhere(
   readRows: RowReader,
   trkorr: string,
   objects: TransportObject[],
-  batchSize = 40,
 ): Promise<ObjectElsewhere[]> {
-  const names = [...new Set(objects.map((o) => o.name))].filter(Boolean);
-  const statuses = [...MODIFIABLE_STATUSES]
-    .map((status) => `'${status}'`)
-    .join(', ');
+  const names = [...new Set(objects.map((o) => o.name))]
+    .filter(Boolean)
+    // A quote would break the statement; no real SAP object name contains one.
+    .filter((name) => !name.includes("'"));
+  if (!names.length) return [];
 
-  const found: ObjectElsewhere[] = [];
-  const ownTree = new Set([trkorr, ...objects.map((o) => o.trkorr)]);
+  const OBJECT_QUERY =
+    'SELECT TRKORR, OBJECT, OBJ_NAME FROM E071 WHERE OBJ_NAME IN (  )';
+  const candidates: Array<{ trkorr: string; type: string; name: string }> = [];
 
-  for (let start = 0; start < names.length; start += batchSize) {
-    const batch = names
-      .slice(start, start + batchSize)
-      // A quote in an object name would break the statement; SAP names cannot
-      // contain one, so anything that does is not a real object.
-      .filter((name) => !name.includes("'"))
-      .map((name) => `'${name}'`);
-    if (!batch.length) continue;
-
+  for (const batch of batchByLength(names, OBJECT_QUERY.length)) {
     const rows = await readRows(
-      `SELECT e~TRKORR, e~PGMID, e~OBJECT, e~OBJ_NAME, h~AS4USER, h~TRSTATUS, h~STRKORR ` +
-        `FROM E071 AS e INNER JOIN E070 AS h ON h~TRKORR = e~TRKORR ` +
-        `WHERE e~OBJ_NAME IN ( ${batch.join(', ')} ) AND h~TRSTATUS IN ( ${statuses} )`,
+      `SELECT TRKORR, OBJECT, OBJ_NAME FROM E071 WHERE OBJ_NAME IN ( ${quote(batch)} )`,
       2000,
     );
-
     for (const row of rows) {
-      const otherTrkorr = text(row, 'TRKORR');
-      const parent = text(row, 'STRKORR');
-      if (ownTree.has(otherTrkorr) || ownTree.has(parent)) continue;
-
-      const name = text(row, 'OBJ_NAME');
-      const type = text(row, 'OBJECT');
-      // The name query is deliberately loose; keep only genuine matches.
-      if (!objects.some((o) => o.name === name && o.type === type)) continue;
-
-      found.push({
-        pgmid: text(row, 'PGMID'),
-        type,
-        name,
-        otherTrkorr,
-        otherOwner: text(row, 'AS4USER'),
-        otherStatus: text(row, 'TRSTATUS'),
+      candidates.push({
+        trkorr: text(row, 'TRKORR'),
+        type: text(row, 'OBJECT'),
+        name: text(row, 'OBJ_NAME'),
       });
     }
+  }
+
+  // Everything belonging to this transport's own task tree reports itself.
+  const ownTree = new Set([trkorr, ...objects.map((o) => o.trkorr)]);
+  const foreign = candidates.filter((c) => !ownTree.has(c.trkorr));
+  if (!foreign.length) return [];
+
+  const HEADER_QUERY =
+    'SELECT TRKORR, TRFUNCTION, TRSTATUS, AS4USER, STRKORR FROM E070 WHERE TRKORR IN (  )';
+  const headers = new Map<string, TransportHeader>();
+
+  for (const batch of batchByLength(
+    [...new Set(foreign.map((c) => c.trkorr))],
+    HEADER_QUERY.length,
+  )) {
+    const rows = await readRows(
+      `SELECT TRKORR, TRFUNCTION, TRSTATUS, AS4USER, STRKORR FROM E070 WHERE TRKORR IN ( ${quote(batch)} )`,
+      2000,
+    );
+    for (const row of rows) {
+      const header = rowToHeader(row);
+      headers.set(header.trkorr, header);
+    }
+  }
+
+  const found: ObjectElsewhere[] = [];
+  for (const candidate of foreign) {
+    const header = headers.get(candidate.trkorr);
+    if (!header) continue;
+    // A task whose request is this transport is still our own work.
+    if (header.parent && ownTree.has(header.parent)) continue;
+    if (!MODIFIABLE_STATUSES.has(header.status)) continue;
+    if (!RELEASABLE_FUNCTIONS.has(header.function)) continue;
+
+    const original = objects.find(
+      (o) => o.name === candidate.name && o.type === candidate.type,
+    );
+    if (!original) continue;
+
+    found.push({
+      pgmid: original.pgmid,
+      type: candidate.type,
+      name: candidate.name,
+      otherTrkorr: candidate.trkorr,
+      otherOwner: header.owner,
+      otherStatus: header.status,
+    });
   }
 
   return found;

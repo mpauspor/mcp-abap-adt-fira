@@ -504,6 +504,10 @@ import {
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
 import {
+  TOOL_DEFINITION as CheckTransport_Tool,
+  handleCheckTransport,
+} from '../../../handlers/transport/high/handleCheckTransport';
+import {
   TOOL_DEFINITION as CreateTransport_Tool,
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
@@ -1101,6 +1105,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RunAtcCheck_Tool,
         handler: withContext(handleRunAtcCheck),
+      },
+      // What to look at before releasing a transport
+      {
+        toolDefinition: CheckTransport_Tool,
+        handler: withContext(handleCheckTransport),
       },
       // abapGit (ADT-integrated)
       {

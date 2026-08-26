@@ -183,6 +183,23 @@ objects analysed is reported as an error rather than as passing. And a run that
 hits a limit is flagged through `objectSetIsComplete`, which is the only thing
 distinguishing a truncated run from a clean one.
 
+### Before releasing a transport
+
+`CheckTransport` answers the question that sits between creating a request and
+releasing it: is this going to break the next system?
+
+Blockers are what SAP or the landscape will punish — a request that does not
+exist, holds no objects, has no target system (it releases happily and arrives
+nowhere), or still has open tasks, which SAP refuses to release past.
+
+The warning that matters most is an object that also sits in **another open
+request**. Releasing this one alone moves a partial version of that object
+downstream, and nothing about the release itself tells you. It is a warning
+rather than a blocker because it is often deliberate.
+
+The judgement is a pure function over the transport tables, so every rule is
+unit tested — including cases that are awkward to stage on a real system.
+
 ### Transport release
 
 `ReleaseTransport`, so releasing no longer means leaving the tool for SE01. SAP
@@ -211,9 +228,10 @@ have the ADT abapGit component installed.
 | Local files | Verified live |
 | Debugger | Full cycle verified live |
 | ATC | Verified live — real findings on a real package |
+| Transport pre-release check | Logic unit tested; **not yet run against a live system** |
 | abapGit | Compiles; component absent on the test system |
 
-571 unit tests, 43 integration tests.
+583 unit tests, 43 integration tests.
 
 ```bash
 npm test                  # unit

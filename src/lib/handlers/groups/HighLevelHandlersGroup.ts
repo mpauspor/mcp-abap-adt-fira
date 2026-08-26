@@ -369,6 +369,10 @@ import {
   TOOL_DEFINITION as GetMetadataExtension_Tool,
   handleGetMetadataExtension,
 } from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
+import {
+  TOOL_DEFINITION as CompareTableAcrossSystems_Tool,
+  handleCompareTableAcrossSystems,
+} from '../../../handlers/multisystem/high/handleCompareTableAcrossSystems';
 // Import high-level handlers
 // Import TOOL_DEFINITION from handlers
 import {
@@ -1110,6 +1114,11 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: CheckTransport_Tool,
         handler: withContext(handleCheckTransport),
+      },
+      // Customizing across the landscape, not just code
+      {
+        toolDefinition: CompareTableAcrossSystems_Tool,
+        handler: withContext(handleCompareTableAcrossSystems),
       },
       // abapGit (ADT-integrated)
       {

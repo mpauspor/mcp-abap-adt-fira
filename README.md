@@ -129,6 +129,30 @@ Function groups are expanded into their function modules and includes. Without
 that a typical custom package reports almost nothing, since a `FUGR` has no
 source of its own.
 
+### Customizing across systems, not just code
+
+`CompareTableAcrossSystems` compares the **contents** of a table between this
+system and another. When a process behaves differently in QAS or production and
+the code is identical, the answer is usually configuration, and comparing source
+cannot see it.
+
+It reports rows missing on either side and rows whose fields differ, naming the
+key of each and which fields drive the differences. Key fields come from the
+dictionary unless overridden.
+
+`MANDT` is excluded from both the key and the comparison, since each connection
+runs in its own client. That has a consequence worth stating: a table whose only
+key is the client cannot be matched row by row across systems, and the tool
+refuses rather than pairing rows arbitrarily — an empty key hashes every row to
+the same value and produces output that looks like a real comparison.
+
+Nothing else is ignored unless you name it in `ignore_fields`. Change-tracking
+fields do differ constantly between systems, but hiding fields by default would
+turn a real difference into an apparently clean result.
+
+A side that hits the row cap is reported as `comparable: false`, because rows
+that were never read are indistinguishable from rows that are missing.
+
 ### Objects too large for a tool call
 
 A 165 KB report cannot be passed as a tool argument, and reading one back
@@ -236,9 +260,10 @@ have the ADT abapGit component installed.
 | Debugger | Full cycle verified live |
 | ATC | Verified live — real findings on a real package |
 | Transport pre-release check | Verified live, including a real cross-request overlap |
+| Customizing comparison | Verified live across three systems, on real differences |
 | abapGit | Compiles; component absent on the test system |
 
-588 unit tests, 43 integration tests.
+599 unit tests, 43 integration tests.
 
 ```bash
 npm test                  # unit

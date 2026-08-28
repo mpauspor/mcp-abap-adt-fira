@@ -30,8 +30,18 @@ export async function handleListSystems(
 ) {
   const { connection, logger } = context;
   try {
-    const systems = listAvailableSystems();
+    const current = await currentSystemInfo(connection);
     const directories = sessionsDirectories();
+
+    // Drop the system we are already on. Comparing it against itself always
+    // reports "identical", so a mistyped target name would come back clean and
+    // be believed — the plausible-but-wrong answer this server exists to avoid.
+    const systems = listAvailableSystems().filter(
+      (system) =>
+        !current?.url ||
+        system.url !== current.url ||
+        system.client !== current.client,
+    );
 
     const usable = systems.filter((system) => system.has_credentials);
 
@@ -43,7 +53,7 @@ export async function handleListSystems(
       data: JSON.stringify(
         {
           success: true,
-          current_system: await currentSystemInfo(connection),
+          current_system: current,
           comparison_systems: systems,
           count: systems.length,
           sessions_directories: directories,

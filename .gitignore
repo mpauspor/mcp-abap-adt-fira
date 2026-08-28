@@ -89,3 +89,6 @@ desktop.ini
 .claude/settings.local.json
 .codex
 .worktrees/
+
+# Credenciales de los sistemas: nunca al repositorio
+sessions/

@@ -170,7 +170,8 @@ function spawnServer(entryPath, cliArgs) {
 function spawnInspector(port) {
   const inspectorCmd = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   const args = [
-    '@modelcontextprotocol/inspector',
+    '-y',
+    '@modelcontextprotocol/inspector@0.21.1',
     '--transport',
     'http',
     '--server-url',

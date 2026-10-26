@@ -61,7 +61,7 @@
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport=http",
     "start:sse": "node ./bin/mcp-abap-adt.js --transport=sse",
-    "dev": "npm run build && npx @modelcontextprotocol/inspector node ./dist/server/launcher.js --transport=stdio",
+    "dev": "npm run build && npx -y @modelcontextprotocol/inspector@0.21.1 node ./dist/server/launcher.js --transport=stdio",
     "dev:http": "npm run build && node ./tools/dev-http-v2.js",
     "dev:sse": "npm run build && node ./tools/dev-sse-v2.js",
     "kill-ports": "lsof -ti:3000,3001,4000,4001,5000,6274,6277 | xargs -r kill -9 2>/dev/null || true",
@@ -115,7 +115,6 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
-    "@modelcontextprotocol/inspector": "^0.21.1",
     "@types/diff": "^5.2.3",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",

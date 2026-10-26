@@ -82,8 +82,9 @@ describe('version diff tools (#30)', () => {
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
-      content_uri_from: '/x?version=00001',
-      content_uri_to: '/x?version=00002',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
 
     expect(result.isError).toBe(false);
@@ -94,8 +95,9 @@ describe('version diff tools (#30)', () => {
   it('returns an error for an unknown object_type', async () => {
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'nonsense',
-      content_uri_from: '/x?version=00001',
-      content_uri_to: '/x?version=00002',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
     expect(result.isError).toBe(true);
     expect(mockClassGetVersionSource).not.toHaveBeenCalled();
@@ -107,18 +109,19 @@ describe('version diff tools (#30)', () => {
       .mockResolvedValueOnce('b\n');
 
     const result = await tool('GetClassVersionDiff').handler(ctx, {
-      content_uri_from: '/cls?version=00001',
-      content_uri_to: '/cls?version=00002',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
 
     expect(result.isError).toBe(false);
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       1,
-      '/cls?version=00001',
+      '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
     );
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       2,
-      '/cls?version=00002',
+      '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     );
     const data = payload(result);
     expect(data.identical).toBe(false);
@@ -127,7 +130,8 @@ describe('version diff tools (#30)', () => {
 
   it('GetClassVersionDiff errors without both content_uris', async () => {
     const result = await tool('GetClassVersionDiff').handler(ctx, {
-      content_uri_from: '/cls?version=00001',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
     });
     expect(result.isError).toBe(true);
     expect(mockClassGetVersionSource).not.toHaveBeenCalled();
@@ -149,7 +153,9 @@ describe('version diff tools (#30)', () => {
     expect(result.isError).toBe(true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).toContain('not supported');
+    expect(errText).toContain(
+      'No version source for one of the two content URIs (SAP answered 404/406).',
+    );
     expect(errText).not.toContain('stack');
     expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
   });
@@ -161,14 +167,17 @@ describe('version diff tools (#30)', () => {
     mockClassGetVersionSource.mockRejectedValue(err);
 
     const result = await tool('GetClassVersionDiff').handler(ctx, {
-      content_uri_from: '/cls?version=00001',
-      content_uri_to: '/cls?version=00002',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
 
     expect(result.isError).toBe(true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).toContain('not supported');
+    expect(errText).toContain(
+      'No version source for one of the two content URIs (SAP answered 404/406).',
+    );
     expect(errText).not.toContain('stack');
     expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
   });

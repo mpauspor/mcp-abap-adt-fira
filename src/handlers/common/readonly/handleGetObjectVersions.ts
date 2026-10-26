@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectVersions',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.',
+    '[read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetObjectVersionSource).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -111,7 +111,7 @@ export async function handleGetObjectVersions(
       if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
         return return_error(
           new Error(
-            `Version history is not supported for object_type '${object_type}' (${object_name}).`,
+            `No version history for ${object_type} ${object_name.toUpperCase()}: the object does not exist, or this system offers no version resource for this object type (SAP answered 404/406).`,
           ),
         );
       }

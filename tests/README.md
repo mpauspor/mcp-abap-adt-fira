@@ -202,7 +202,10 @@ Place your session `.env` file in the standard sessions folder:
 # e.g., ~/Documents/mcp-abap-adt/sessions/e19.env
 SAP_URL=http://your-sap-system.com:8000
 SAP_USERNAME=your-username
-SAP_PASSWORD=your-password
+# Preferred on Windows: store password via cmdkey and reference the credential target
+SAP_CREDENTIAL_TARGET=mcp-abap-adt:e19
+# Or fallback (plain text password in file):
+# SAP_PASSWORD=your-password
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 ```

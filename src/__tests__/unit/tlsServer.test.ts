@@ -17,7 +17,9 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  fs.rmSync(certDir, { recursive: true, force: true });
+  if (certDir) {
+    fs.rmSync(certDir, { recursive: true, force: true });
+  }
 });
 
 describe('createServerListener', () => {

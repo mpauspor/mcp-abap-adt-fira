@@ -92,3 +92,10 @@ desktop.ini
 
 # Credenciales de los sistemas: nunca al repositorio
 sessions/
+
+# triad orchestrator state and logs
+.triad/
+
+# machine-local agent MCP configuration (kept in the notes repository)
+.mcp.json
+.gemini/

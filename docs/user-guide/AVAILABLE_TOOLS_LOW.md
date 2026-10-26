@@ -463,9 +463,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `tests` (array, required) - List of container/test class pairs to execute.
@@ -548,7 +548,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateobjectlow-low-level-common"></a>
 #### ActivateObjectLow (Low-Level / Common)
-**Description:** [low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.
+**Description:** [low-level] Activate one or multiple ABAP repository objects. URI is derived from name and type; pass an explicit uri to override.
 
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
 
@@ -1991,4 +1991,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-10-26*

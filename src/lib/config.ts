@@ -8,6 +8,7 @@
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
+import { resolveBasicPassword } from './landscape/passwordResolver';
 
 // Don't import setConfigOverride from utils.ts to avoid circular dependency
 // setConfigOverride will be called lazily if needed
@@ -132,7 +133,7 @@ export function getConfig(): SapConfig {
   } else {
     // basic (and rfc connection type) require username/password
     const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
+    const password = resolveBasicPassword(process.env);
     if (!username || !password) {
       throw new Error(
         `Missing SAP_USERNAME or SAP_PASSWORD for ${authType} authentication`,

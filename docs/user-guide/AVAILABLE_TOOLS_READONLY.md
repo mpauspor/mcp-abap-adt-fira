@@ -3,11 +3,15 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 64
+- Total tools: 75
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Abapgit](#read-only-abapgit)
+    - [AbapGitGetErrorLog](#abapgitgeterrorlog-read-only-abapgit)
+    - [AbapGitGetRepo](#abapgitgetrepo-read-only-abapgit)
+    - [AbapGitListRepos](#abapgitlistrepos-read-only-abapgit)
   - [Behavior Definition](#read-only-behavior-definition)
     - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
@@ -22,6 +26,10 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ReadDataElement](#readdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
     - [ReadDdl](#readddl-read-only-ddl)
+  - [Debugger](#read-only-debugger)
+    - [DebuggerGetStack](#debuggergetstack-read-only-debugger)
+    - [DebuggerGetVariable](#debuggergetvariable-read-only-debugger)
+    - [DebuggerListBreakpoints](#debuggerlistbreakpoints-read-only-debugger)
   - [Domain](#read-only-domain)
     - [ReadDomain](#readdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
@@ -46,6 +54,12 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ReadMessageClassMessage](#readmessageclassmessage-read-only-message-class)
   - [Metadata Extension](#read-only-metadata-extension)
     - [ReadMetadataExtension](#readmetadataextension-read-only-metadata-extension)
+  - [Multisystem](#read-only-multisystem)
+    - [CompareObjectAcrossSystems](#compareobjectacrosssystems-read-only-multisystem)
+    - [ComparePackageAcrossLandscape](#comparepackageacrosslandscape-read-only-multisystem)
+    - [ComparePackageAcrossSystems](#comparepackageacrosssystems-read-only-multisystem)
+    - [ListLandscapeSystems](#listlandscapesystems-read-only-multisystem)
+    - [ListSystems](#listsystems-read-only-multisystem)
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
     - [ReadPackage](#readpackage-read-only-package)
@@ -101,6 +115,42 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-abapgit"></a>
+### Read-Only / Abapgit
+
+<a id="abapgitgeterrorlog-read-only-abapgit"></a>
+#### AbapGitGetErrorLog (Read-Only / Abapgit)
+**Description:** [read-only] Read the per-object error log of the last abapGit operation on a package. Use after a failed AbapGitPull to find which objects failed and why.
+
+**Source:** `src/handlers/abapgit/readonly/handleAbapGitGetErrorLog.ts`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package name (e.g., ZMY_PACKAGE).
+
+---
+
+<a id="abapgitgetrepo-read-only-abapgit"></a>
+#### AbapGitGetRepo (Read-Only / Abapgit)
+**Description:** [read-only] Read the abapGit link status of one package: repository URL, branch and status. Poll this until status is not 'R' (running) before issuing another AbapGitPull or an AbapGitUnlink.
+
+**Source:** `src/handlers/abapgit/readonly/handleAbapGitGetRepo.ts`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package name (e.g., ZMY_PACKAGE).
+
+---
+
+<a id="abapgitlistrepos-read-only-abapgit"></a>
+#### AbapGitListRepos (Read-Only / Abapgit)
+**Description:** [read-only] List all packages linked to a Git repository through ADT-integrated abapGit, with each link's URL, branch and status. Status R means a pull is still running.
+
+**Source:** `src/handlers/abapgit/readonly/handleAbapGitListRepos.ts`
+
+**Parameters:**
+- None
+
+---
 
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
@@ -165,7 +215,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetObjectVersionSource).
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -215,6 +265,44 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-debugger"></a>
+### Read-Only / Debugger
+
+<a id="debuggergetstack-read-only-debugger"></a>
+#### DebuggerGetStack (Read-Only / Debugger)
+**Description:** [debugger] Read the ABAP call stack of the currently attached debuggee. Requires an active debugger session from DebuggerListen.
+
+**Source:** `src/handlers/debugger/readonly/handleDebuggerGetStack.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="debuggergetvariable-read-only-debugger"></a>
+#### DebuggerGetVariable (Read-Only / Debugger)
+**Description:** [debugger] Read variables from the attached debuggee. Pass variable_name (or variable_names) to read specific ones; omit both to list what is visible in the current stack frame. Requires an active session from DebuggerListen.
+
+**Source:** `src/handlers/debugger/readonly/handleDebuggerGetVariable.ts`
+
+**Parameters:**
+- `parent` (string, optional) - When listing, the node to expand. Defaults to '@ROOT' (the current frame). Pass a structure or table name to expand its components.
+- `variable_name` (string, optional) - Variable to read, as written in ABAP, e.g. GV_INDEX.
+- `variable_names` (array, optional) - Several variables at once.
+
+---
+
+<a id="debuggerlistbreakpoints-read-only-debugger"></a>
+#### DebuggerListBreakpoints (Read-Only / Debugger)
+**Description:** [debugger] List the external breakpoints this server has registered, with the id needed to delete one. Two things it cannot show: breakpoints set in SAP GUI (those are session breakpoints ADT cannot see) and breakpoints left by an earlier run of this server — SAP offers no way to read the set back. DebuggerDeleteBreakpoint with all=true clears those regardless.
+
+**Source:** `src/handlers/debugger/readonly/handleDebuggerListBreakpoints.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -421,6 +509,83 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `metadata_extension_name` (string, required) - Metadata extension name (e.g., Z_MY_DDLX).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-multisystem"></a>
+### Read-Only / Multisystem
+
+<a id="compareobjectacrosssystems-read-only-multisystem"></a>
+#### CompareObjectAcrossSystems (Read-Only / Multisystem)
+**Description:** [read-only] Compare one repository object's source between the current system and another one (or between two named systems), returning a unified diff. Answers "is this object the same in QAS as in DEV?" and "has it reached PRD yet?". Note that ABAP version numbers are per-system counters and are NOT comparable — this compares source. Use ListSystems for the available names.
+
+**Source:** `src/handlers/multisystem/readonly/handleCompareObjectAcrossSystems.ts`
+
+**Parameters:**
+- `context_lines` (number, optional) - Context lines around each change. Default 3.
+- `include_diff` (boolean, optional) - Include the unified diff text. Default true. Set false for a verdict only, when scanning many objects.
+- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_type` (string, required) - Object type code: CLAS/OC, INTF/OI, PROG/P, PROG/I (include), DDLS/DF, TABL, STRU, BDEF, SRVD, DDLX, FUGR/FF.
+- `parent_name` (string, optional) - Function group, required for function modules (FUGR/FF).
+- `source_system` (string, optional) - Optional. Name of the system to compare FROM. Defaults to the system this server is connected to.
+- `target_system` (string, required) - Name of the system to compare against (from ListSystems), e.g. qs4.
+
+---
+
+<a id="comparepackageacrosslandscape-read-only-multisystem"></a>
+#### ComparePackageAcrossLandscape (Read-Only / Multisystem)
+**Description:** [read-only] Walk a package across an ordered promotion chain (e.g. QAS then PRD) in ONE call and report how far each object has travelled from the current system. Use instead of running CompareObjectAcrossSystems per system and cross-referencing by hand. Flags out-of-band changes, where a downstream system matches while an upstream one does not. Function groups are expanded into modules and includes; use object_types to narrow a large package.
+
+**Source:** `src/handlers/multisystem/readonly/handleComparePackageAcrossLandscape.ts`
+
+**Parameters:**
+- `concurrency` (number, optional) -
+- `include_subpackages` (boolean, optional) - Include sub-packages. Default false.
+- `max_objects` (number, optional) -
+- `object_types` (array, optional) - Optional filter on the type as the PACKAGE reports it, e.g. ["CLAS/OC","PROG/P","TABL/DS","FUGR/F"]. Strongly recommended on large packages.
+- `only_pending` (boolean, optional) - Return only objects that have NOT reached the end of the chain. Default true.
+- `package_name` (string, required) - ABAP package, e.g. ZSD.
+- `systems` (array, required) - Target systems IN PROMOTION ORDER, e.g. ["qs4","ps4"]. Names come from ListSystems. The current system is always the source.
+
+---
+
+<a id="comparepackageacrosssystems-read-only-multisystem"></a>
+#### ComparePackageAcrossSystems (Read-Only / Multisystem)
+**Description:** [read-only] Compare every source object in a package between the current system and another one, reporting which objects are identical, which differ, and which exist in only one system. This is the custom-code drift survey across a landscape (DEV vs QAS vs PRD). Function groups are expanded into their function modules and includes. Diffs are omitted by default — use CompareObjectAcrossSystems on the objects that differ.
+
+**Source:** `src/handlers/multisystem/readonly/handleComparePackageAcrossSystems.ts`
+
+**Parameters:**
+- `include_subpackages` (boolean, optional) - Include sub-packages. Default false.
+- `max_objects` (number, optional) -
+- `only_differences` (boolean, optional) - Return only the objects that are not identical. Default true — the identical ones are rarely what you are looking for.
+- `package_name` (string, required) - ABAP package, e.g. ZMY_PACKAGE.
+- `target_system` (string, required) - Name of the system to compare against (from ListSystems), e.g. qs4.
+
+---
+
+<a id="listlandscapesystems-read-only-multisystem"></a>
+#### ListLandscapeSystems (Read-Only / Multisystem)
+**Description:** [read-only] Enumerate SAP systems defined in the local SAP Logon landscape XML file (SAPUILandscape.xml), derive ADT URLs, correlate with existing session files, and optionally probe reachability.
+
+**Source:** `src/handlers/multisystem/readonly/handleListLandscapeSystems.ts`
+
+**Parameters:**
+- `folder` (string, optional) - Case-insensitive substring match against any folder segment. Used to narrow to one customer.
+- `landscape_path` (string, optional) - Path to SAPUILandscape.xml. Defaults to SAP_LANDSCAPE_PATH or %APPDATA%\SAP\Common\SAPUILandscape.xml.
+- `probe` (boolean, optional) - Whether to probe network reachability and TLS status of derived ADT URLs. Default is false.
+- `probe_limit` (integer, optional) - Maximum number of matching systems to probe when probe is true. Default: 10, max: 25.
+
+---
+
+<a id="listsystems-read-only-multisystem"></a>
+#### ListSystems (Read-Only / Multisystem)
+**Description:** [read-only] List the SAP systems this server can reach for cross-system comparison, plus the system it is itself connected to. Use the returned names with CompareObjectAcrossSystems and ComparePackageAcrossSystems. Reports connection metadata only — never credentials.
+
+**Source:** `src/handlers/multisystem/readonly/handleListSystems.ts`
+
+**Parameters:**
+- None
 
 ---
 
@@ -696,7 +861,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
-- `sql_query` (string, required) - SQL query to execute
+- `sql_query` (string, required) - SQL query to execute. Omit INTO and UP TO ... ROWS — SAP adds them. Use row_number to limit rows.
 
 ---
 
@@ -747,7 +912,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `top` (number, optional) - Number of top rows for summary. Default: 10.
 - `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
-- `view` (string, optional (default: hitlist)) - 
+- `view` (string, optional (default: hitlist)) -
 - `with_system_events` (boolean, optional) - Include system events.
 
 ---
@@ -759,20 +924,20 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) -
+- `all_db_events` (boolean, optional) -
+- `all_dynpro_events` (boolean, optional) -
+- `all_internal_table_events` (boolean, optional) -
+- `all_misc_abap_statements` (boolean, optional) -
+- `all_procedural_units` (boolean, optional) -
+- `all_system_kernel_events` (boolean, optional) -
+- `amdp_trace` (boolean, optional) -
 - `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
+- `explicit_on_off` (boolean, optional) -
+- `max_size_for_trace_file` (number, optional) -
+- `max_time_for_tracing` (number, optional) -
+- `sql_trace` (boolean, optional) -
+- `with_rfc_tracing` (boolean, optional) -
 
 ---
 
@@ -867,25 +1032,26 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) -
+- `all_db_events` (boolean, optional) -
+- `all_dynpro_events` (boolean, optional) -
+- `all_internal_table_events` (boolean, optional) -
+- `all_misc_abap_statements` (boolean, optional) -
+- `all_procedural_units` (boolean, optional) -
+- `all_system_kernel_events` (boolean, optional) -
+- `amdp_trace` (boolean, optional) -
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional) -
+- `max_size_for_trace_file` (number, optional) -
+- `max_time_for_tracing` (number, optional) -
 - `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.
 - `profile` (boolean, optional) - When true, run with the profiler and resolve the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
+- `skip_activation_check` (boolean, optional) - Skip the pre-flight check for unactivated changes. Default false. The check exists because SAP runs the ACTIVE load: with unactivated changes the run returns the previous version's output, which is indistinguishable from a caching bug.
+- `sql_trace` (boolean, optional) -
 - `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced, profile=true).
 - `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) -
 
 ---
 
@@ -896,24 +1062,24 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) -
+- `all_db_events` (boolean, optional) -
+- `all_dynpro_events` (boolean, optional) -
+- `all_internal_table_events` (boolean, optional) -
+- `all_misc_abap_statements` (boolean, optional) -
+- `all_procedural_units` (boolean, optional) -
+- `all_system_kernel_events` (boolean, optional) -
+- `amdp_trace` (boolean, optional) -
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional) -
+- `max_size_for_trace_file` (number, optional) -
+- `max_time_for_tracing` (number, optional) -
 - `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).
-- `sql_trace` (boolean, optional) - 
+- `sql_trace` (boolean, optional) -
 - `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced).
 - `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000).
-- `with_rfc_tracing` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) -
 
 ---
 
@@ -924,22 +1090,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) -
+- `all_db_events` (boolean, optional) -
+- `all_dynpro_events` (boolean, optional) -
+- `all_internal_table_events` (boolean, optional) -
+- `all_misc_abap_statements` (boolean, optional) -
+- `all_procedural_units` (boolean, optional) -
+- `all_system_kernel_events` (boolean, optional) -
+- `amdp_trace` (boolean, optional) -
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional) -
+- `max_size_for_trace_file` (number, optional) -
+- `max_time_for_tracing` (number, optional) -
 - `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
 - `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
+- `sql_trace` (boolean, optional) -
+- `with_rfc_tracing` (boolean, optional) -
 
 ---
 
@@ -950,21 +1116,21 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeRunProgramWithProfiling.ts`
 
 **Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
+- `aggregate` (boolean, optional) -
+- `all_db_events` (boolean, optional) -
+- `all_dynpro_events` (boolean, optional) -
+- `all_internal_table_events` (boolean, optional) -
+- `all_misc_abap_statements` (boolean, optional) -
+- `all_procedural_units` (boolean, optional) -
+- `all_system_kernel_events` (boolean, optional) -
+- `amdp_trace` (boolean, optional) -
 - `description` (string, optional) - Profiler trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
+- `explicit_on_off` (boolean, optional) -
+- `max_size_for_trace_file` (number, optional) -
+- `max_time_for_tracing` (number, optional) -
 - `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
+- `sql_trace` (boolean, optional) -
+- `with_rfc_tracing` (boolean, optional) -
 
 ---
 
@@ -1033,4 +1199,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-10-26*

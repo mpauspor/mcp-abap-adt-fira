@@ -93,3 +93,98 @@ export function resolveVersionedObject(
       return null;
   }
 }
+
+function sanitizeUriForError(val: unknown): string {
+  return (
+    String(val)
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: sanitize control characters from error output
+      .replace(/[\x00-\x1f]/g, '')
+      .slice(0, 80)
+  );
+}
+
+/**
+ * Validates that an untrusted version content URI is a safe relative ADT path.
+ *
+ * Implements the contract of decision D-011 and object-version spec §3.1
+ * - Must be a string
+ * - Length 1..2048
+ * - No control characters (< U+0021 including space), DEL (U+007F), backslash (\), or hash (#)
+ * - Must start with `/sap/bc/adt/`
+ * - No `//` anywhere in the path
+ * - No `.` or `..` path segments (before or after URI decoding)
+ * - Valid percent-encoding in path
+ *
+ * @param uri The untrusted URI value from tool arguments
+ * @param field The field name being validated ('content_uri', 'content_uri_from', 'content_uri_to')
+ * @returns The validated URI string unchanged
+ * @throws Error if validation fails, with message:
+ *   `${field} must be a relative ADT path starting with /sap/bc/adt/, as returned in a version entry's contentUri (got: ${sanitized}).`
+ */
+export function assertVersionContentUri(uri: unknown, field: string): string {
+  const err = () =>
+    new Error(
+      `${field} must be a relative ADT path starting with /sap/bc/adt/, as returned in a version entry's contentUri (got: ${sanitizeUriForError(
+        uri,
+      )}).`,
+    );
+
+  if (typeof uri !== 'string' || uri.length === 0 || uri.length > 2048) {
+    throw err();
+  }
+
+  // Check forbidden characters: control characters (< U+0021 including space U+0020),
+  // DEL (U+007F), backslash (\), and hash (#).
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: validate URI characters against control and delimiter characters
+  if (/[\u0000-\u0020\u007f\\#]/.test(uri)) {
+    throw err();
+  }
+
+  if (!uri.startsWith('/sap/bc/adt/')) {
+    throw err();
+  }
+
+  const queryIndex = uri.indexOf('?');
+  const pathPart = queryIndex === -1 ? uri : uri.slice(0, queryIndex);
+
+  if (pathPart.includes('//')) {
+    throw err();
+  }
+
+  const segments = pathPart.split('/');
+  for (const segment of segments) {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(segment);
+    } catch {
+      throw err();
+    }
+    if (decoded === '.' || decoded === '..') {
+      throw err();
+    }
+  }
+
+  return uri;
+}
+
+/**
+ * Asserts that the source returned by getVersionSource is not an HTML page
+ * (e.g. login redirect, error page, session expiration).
+ *
+ * Contract (object-version spec §3.4):
+ * - Checks: /^\s*<(?:!doctype\s+html|html)[\s>]/i
+ * - Does not throw for null/undefined or ABAP source that contains <html> later in text.
+ */
+export function assertNotHtmlSource(
+  source: unknown,
+  field: string,
+  contentUri?: string,
+): void {
+  const text = typeof source === 'string' ? source : String(source ?? '');
+  if (/^\s*<(?:!doctype\s+html|html)[\s>]/i.test(text)) {
+    const uriLabel = contentUri || field;
+    throw new Error(
+      `SAP returned an HTML page instead of source for ${field} (${uriLabel}). The session may have expired, or the URI is not a version resource.`,
+    );
+  }
+}

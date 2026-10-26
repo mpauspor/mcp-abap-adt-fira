@@ -28,6 +28,7 @@ import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { resolveEnvFilePath } from '../config/envResolver';
+import { resolveBasicPassword } from '../landscape/passwordResolver';
 import { getPlatformPaths } from '../stores/platformPaths';
 import { getSystemContext } from '../systemContext';
 import { makeAdtRequestWithTimeout } from '../utils';
@@ -103,7 +104,8 @@ export function listAvailableSystems(): SecondarySystemInfo[] {
         has_credentials: !!(
           env.SAP_PASSWORD ||
           env.SAP_JWT_TOKEN ||
-          env.SAP_CERT_PFX_PATH
+          env.SAP_CERT_PFX_PATH ||
+          env.SAP_CREDENTIAL_TARGET
         ),
       });
     }
@@ -189,9 +191,10 @@ export function getSecondaryConnection(
       `System "${systemName}" (${envPath}) is missing: ${missing.join(', ')}.`,
     );
   }
-  if (!env.SAP_PASSWORD && (env.SAP_AUTH_TYPE ?? 'basic') === 'basic') {
+  const password = resolveBasicPassword(env);
+  if (!password && (env.SAP_AUTH_TYPE ?? 'basic') === 'basic') {
     throw new Error(
-      `System "${systemName}" (${envPath}) uses basic auth but has no SAP_PASSWORD.`,
+      `System "${systemName}" (${envPath}) uses basic auth but has no SAP_PASSWORD or valid SAP_CREDENTIAL_TARGET.`,
     );
   }
 
@@ -206,7 +209,7 @@ export function getSecondaryConnection(
       authType: (env.SAP_AUTH_TYPE as any) || 'basic',
       connectionType: (env.SAP_CONNECTION_TYPE as any) || 'http',
       username: env.SAP_USERNAME,
-      password: env.SAP_PASSWORD,
+      password: password,
       jwtToken: env.SAP_JWT_TOKEN,
     },
     logger as any,

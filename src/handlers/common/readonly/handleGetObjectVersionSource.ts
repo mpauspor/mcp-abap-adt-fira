@@ -15,6 +15,8 @@ import {
   return_response,
 } from '../../../lib/utils';
 import {
+  assertNotHtmlSource,
+  assertVersionContentUri,
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
 } from './resolveVersionedObject';
@@ -61,6 +63,7 @@ export async function handleGetObjectVersionSource(
         new Error('object_type and content_uri are required'),
       );
     }
+    assertVersionContentUri(content_uri, 'content_uri');
     if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
       return return_error(
         new Error(
@@ -81,6 +84,7 @@ export async function handleGetObjectVersionSource(
 
     try {
       const source = await resolved.obj.getVersionSource(content_uri);
+      assertNotHtmlSource(source, 'content_uri', content_uri);
       return return_response({
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       } as AxiosResponse);
@@ -88,7 +92,7 @@ export async function handleGetObjectVersionSource(
       if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
         return return_error(
           new Error(
-            `Version source is not supported for object_type '${object_type}'.`,
+            `No version source at ${content_uri} (SAP answered 404/406).`,
           ),
         );
       }

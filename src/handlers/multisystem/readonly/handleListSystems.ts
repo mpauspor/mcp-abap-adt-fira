@@ -59,7 +59,7 @@ export async function handleListSystems(
           sessions_directories: directories,
           hint:
             systems.length === 0
-              ? `No comparison systems are defined. Create ${directories[0] ?? '<sessions dir>'}/<name>.env with SAP_URL, SAP_CLIENT, SAP_USERNAME, SAP_PASSWORD, SAP_SYSTEM_TYPE — then use <name> as target_system. A READ-ONLY SAP user is strongly recommended for QAS/PRD.`
+              ? `No comparison systems are defined. Run ListLandscapeSystems and SetupSystem, or create ${directories[0] ?? '<sessions dir>'}/<name>.env with SAP_URL, SAP_CLIENT, SAP_USERNAME, SAP_SYSTEM_TYPE, and SAP_CREDENTIAL_TARGET (preferred) or SAP_PASSWORD — then use <name> as target_system. A READ-ONLY SAP user is strongly recommended for QAS/PRD.`
               : undefined,
         },
         null,

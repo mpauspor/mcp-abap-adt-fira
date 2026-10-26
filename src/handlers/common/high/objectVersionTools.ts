@@ -28,7 +28,11 @@ import {
   return_response,
 } from '../../../lib/utils';
 import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
-import { resolveVersionedObject } from '../readonly/resolveVersionedObject';
+import {
+  assertNotHtmlSource,
+  assertVersionContentUri,
+  resolveVersionedObject,
+} from '../readonly/resolveVersionedObject';
 
 /** Handler signature before context injection (the group wraps with withContext). */
 type RawHandler = (context: HandlerContext, args: any) => Promise<any>;
@@ -148,7 +152,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] List the SAP version history of a ${row.label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${row.display}VersionSource.`,
+    description: `[read-only] List the SAP version history of a ${row.label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to Get${row.display}VersionSource).`,
     inputSchema: {
       type: 'object',
       properties,
@@ -204,7 +208,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
         if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
           return return_error(
             new Error(
-              `Version history is not supported for object_type '${row.object_type}' (${String(name).toUpperCase()}).`,
+              `No version history for ${row.object_type} ${String(name).toUpperCase()}: the object does not exist, or this system offers no version resource for this object type (SAP answered 404/406).`,
             ),
           );
         }
@@ -244,6 +248,7 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
       if (!content_uri) {
         return return_error(new Error('content_uri is required'));
       }
+      assertVersionContentUri(content_uri, 'content_uri');
 
       const client = createAdtClient(connection, logger);
       // content_uri carries the full object identity; a placeholder name is only
@@ -262,6 +267,7 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
 
       try {
         const source = await resolved.obj.getVersionSource(String(content_uri));
+        assertNotHtmlSource(source, 'content_uri', String(content_uri));
         return return_response({
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
         } as AxiosResponse);
@@ -269,7 +275,7 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
         if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
           return return_error(
             new Error(
-              `Version source is not supported for object_type '${row.object_type}'.`,
+              `No version source at ${content_uri} (SAP answered 404/406).`,
             ),
           );
         }
@@ -316,6 +322,8 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
           new Error('content_uri_from and content_uri_to are required'),
         );
       }
+      assertVersionContentUri(content_uri_from, 'content_uri_from');
+      assertVersionContentUri(content_uri_to, 'content_uri_to');
 
       const client = createAdtClient(connection, logger);
       // content_uri carries the full object identity; a placeholder name is only
@@ -357,7 +365,7 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
         if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
           return return_error(
             new Error(
-              `Version diff is not supported for object_type '${row.object_type}'.`,
+              'No version source for one of the two content URIs (SAP answered 404/406).',
             ),
           );
         }

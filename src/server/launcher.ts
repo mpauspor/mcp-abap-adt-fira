@@ -52,37 +52,12 @@ function hasArg(name: string): boolean {
   return process.argv.includes(name);
 }
 
-/**
- * In v2 flow, .env can be loaded into auth-broker session storage without
- * populating process.env. System context resolver relies on process.env
- * for SAP_MASTER_SYSTEM / SAP_RESPONSIBLE, so bridge these values here.
- */
-function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
-  if (!envFilePath || !fs.existsSync(envFilePath)) {
-    return;
-  }
+import {
+  hydrateAndConfigureTls,
+  hydrateSystemContextFromEnvFile,
+} from './envHydration.js';
 
-  try {
-    const parsed = dotenv.parse(fs.readFileSync(envFilePath, 'utf8'));
-    const keys: Array<keyof NodeJS.ProcessEnv> = [
-      'SAP_MASTER_SYSTEM',
-      'SAP_RESPONSIBLE',
-      'SAP_USERNAME',
-      'SAP_CLIENT',
-      'SAP_CONNECTION_TYPE',
-      'SAP_SYSTEM_TYPE',
-    ];
-
-    for (const key of keys) {
-      const value = parsed[key];
-      if (!process.env[key] && value) {
-        process.env[key] = value;
-      }
-    }
-  } catch {
-    // Ignore .env parse errors here; auth-broker initialization handles config validation.
-  }
-}
+export { hydrateSystemContextFromEnvFile };
 
 function showVersion(): void {
   const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
@@ -188,7 +163,7 @@ async function main() {
   // Use ServerConfigManager for all config parsing
   const configManager = new ServerConfigManager();
   const config = await configManager.getConfig();
-  hydrateSystemContextFromEnvFile(config.envFile);
+  hydrateAndConfigureTls(config.envFile);
 
   // CLI --connection-type overrides env var
   if (config.connectionType && !process.env.SAP_CONNECTION_TYPE) {
@@ -305,9 +280,12 @@ async function main() {
       );
     }
   } else if (config.envFile || config.mcpDestination) {
-    // Broker not created but config was expected
+    // Broker not created but config was expected. Say why: without the reason,
+    // the next tool call fails on the mock connection instead, and the message
+    // points at the wrong thing (T-013).
+    const reason = authBrokerFactory.lastDefaultBrokerError;
     console.error(
-      `[MCP] Warning: Auth broker not initialized. Config source: ${config.envFile || config.mcpDestination}`,
+      `[MCP] Warning: Auth broker not initialized. Config source: ${config.envFile || config.mcpDestination}${reason ? `. Reason: ${reason}` : ''}`,
     );
   }
 
@@ -325,6 +303,20 @@ async function main() {
     if (configuredBroker) {
       broker = configuredBroker;
       brokerKey = configuredBrokerKey!;
+    } else if (configuredBrokerKey) {
+      // Connection parameters WERE provided and the broker still could not be
+      // created. Inspection-only mode below is for a server started without a
+      // system; falling into it here answers every tool call from a mock
+      // connection whose config carries no client, which is where the
+      // misleading "Basic authentication requires SAP_CLIENT to be provided"
+      // came from (T-013). Say what actually went wrong and stop.
+      const reason = authBrokerFactory.lastDefaultBrokerError;
+      console.error(
+        `[MCP] Cannot connect with ${config.envFile ?? config.mcpDestination}.${
+          reason ? ` ${reason}` : ''
+        }`,
+      );
+      process.exit(1);
     } else {
       // Inspection-only mode: no connection parameters provided
       const { MockAbapConnection } = await import('./MockAbapConnection.js');

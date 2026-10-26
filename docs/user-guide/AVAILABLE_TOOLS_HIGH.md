@@ -3,11 +3,15 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 165
+- Total tools: 178
 
 ## Navigation
 
 - [High-Level Group](#high-level-group)
+  - [Abapgit](#high-level-abapgit)
+    - [AbapGitLink](#abapgitlink-high-level-abapgit)
+    - [AbapGitPull](#abapgitpull-high-level-abapgit)
+    - [AbapGitUnlink](#abapgitunlink-high-level-abapgit)
   - [Behavior Definition](#high-level-behavior-definition)
     - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
@@ -105,6 +109,12 @@ Generated from code in `src/handlers/**` (not from docs).
     - [CheckMetadataExtension](#checkmetadataextension-high-level-ddlx)
     - [CreateMetadataExtension](#createmetadataextension-high-level-ddlx)
     - [UpdateMetadataExtension](#updatemetadataextension-high-level-ddlx)
+  - [Debugger](#high-level-debugger)
+    - [DebuggerDeleteBreakpoint](#debuggerdeletebreakpoint-high-level-debugger)
+    - [DebuggerListen](#debuggerlisten-high-level-debugger)
+    - [DebuggerSetBreakpoint](#debuggersetbreakpoint-high-level-debugger)
+    - [DebuggerStep](#debuggerstep-high-level-debugger)
+    - [DebuggerStop](#debuggerstop-high-level-debugger)
   - [Domain](#high-level-domain)
     - [CheckDomain](#checkdomain-high-level-domain)
     - [CreateDomain](#createdomain-high-level-domain)
@@ -128,6 +138,8 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
+  - [Include](#high-level-include)
+    - [UpdateInclude](#updateinclude-high-level-include)
   - [Interface](#high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
@@ -146,6 +158,9 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Metadata Extension](#high-level-metadata-extension)
     - [DeleteMetadataExtension](#deletemetadataextension-high-level-metadata-extension)
     - [GetMetadataExtension](#getmetadataextension-high-level-metadata-extension)
+  - [Multisystem](#high-level-multisystem)
+    - [CompareTableAcrossSystems](#comparetableacrosssystems-high-level-multisystem)
+    - [SetupSystem](#setupsystem-high-level-multisystem)
   - [Package](#high-level-package)
     - [CheckPackage](#checkpackage-high-level-package)
     - [CreatePackage](#createpackage-high-level-package)
@@ -183,7 +198,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Transport](#high-level-transport)
+    - [CheckTransport](#checktransport-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
+    - [ReleaseTransport](#releasetransport-high-level-transport)
   - [Unit Test](#high-level-unit-test)
     - [CreateCdsUnitTest](#createcdsunittest-high-level-unit-test)
     - [CreateUnitTest](#createunittest-high-level-unit-test)
@@ -203,6 +220,53 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-group"></a>
 ## High-Level Group
+
+<a id="high-level-abapgit"></a>
+### High-Level / Abapgit
+
+<a id="abapgitlink-high-level-abapgit"></a>
+#### AbapGitLink (High-Level / Abapgit)
+**Description:** Link an ABAP package to a Git repository via ADT-integrated abapGit. This records the link only — no objects are imported. Follow with AbapGitPull.
+
+**Source:** `src/handlers/abapgit/high/handleAbapGitLink.ts`
+
+**Parameters:**
+- `branch_name` (string, optional) - Branch to track, e.g. 'refs/heads/main'.
+- `package_name` (string, required) - ABAP package to link (e.g., ZMY_PACKAGE). Must already exist.
+- `remote_password` (string, optional) - Git password or personal access token, for a private repository.
+- `remote_user` (string, optional) - Git user, for a private repository.
+- `transport_request` (string, optional) - Transport request. Required for transportable packages.
+- `url` (string, required) - Git repository URL.
+
+---
+
+<a id="abapgitpull-high-level-abapgit"></a>
+#### AbapGitPull (High-Level / Abapgit)
+**Description:** Pull a package from its linked Git repository via ADT-integrated abapGit. Asynchronous server-side: this waits for completion and reports the final status plus any per-object errors. If it times out, the server job continues — poll AbapGitGetRepo until status is not 'R' before pulling again.
+
+**Source:** `src/handlers/abapgit/high/handleAbapGitPull.ts`
+
+**Parameters:**
+- `branch_name` (string, optional) - Branch to pull, e.g. 'refs/heads/main'. Defaults to the branch recorded on the link.
+- `max_wait_seconds` (number, optional) - How long to wait for the server job before giving up on the wait (default 300). The job itself is not cancelled.
+- `package_name` (string, required) - ABAP package to pull into (e.g., ZMY_PACKAGE).
+- `remote_password` (string, optional) - Git password or personal access token, for a private repository.
+- `remote_user` (string, optional) - Git user, for a private repository.
+- `transport_request` (string, optional) - Transport request for the imported objects. Required for transportable packages.
+
+---
+
+<a id="abapgitunlink-high-level-abapgit"></a>
+#### AbapGitUnlink (High-Level / Abapgit)
+**Description:** Remove the abapGit link between an ABAP package and its Git repository. The ABAP objects in the package are NOT deleted — only the link is removed.
+
+**Source:** `src/handlers/abapgit/high/handleAbapGitUnlink.ts`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package to unlink (e.g., ZMY_PACKAGE).
+- `transport_request` (string, optional) - Transport request. Required for transportable packages.
+
+---
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
@@ -590,7 +654,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a RAP behavior definition. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetBehaviorDefinitionVersionSource.
+**Description:** [read-only] List the SAP version history of a RAP behavior definition. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetBehaviorDefinitionVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -624,7 +688,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetClassVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -658,7 +722,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetDdlVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -692,7 +756,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetFunctionModuleVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -727,7 +791,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetInterfaceVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -761,7 +825,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a CDS metadata extension. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetMetadataExtensionVersionSource.
+**Description:** [read-only] List the SAP version history of a CDS metadata extension. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetMetadataExtensionVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -795,7 +859,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetProgramVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -829,7 +893,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP structure. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetStructureVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP structure. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetStructureVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -863,7 +927,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP table. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetTableVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP table. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetTableVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -895,7 +959,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P). Required for single-object activation form.
 - `object_name` (string, optional) - Object name for single-object activation form.
-- `object_type` (any, optional) - 
+- `object_type` (any, optional) -
 - `objects` (array, optional) - Explicit objects list for batch activation.
 - `preaudit` (boolean, optional) - Run pre-audit checks before activation.
 
@@ -996,7 +1060,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `length` (number, optional) - Length for typed artifacts.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
@@ -1029,7 +1093,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_module_name` (string, optional) - ABAP function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
 - `service_binding_name` (string, optional) - Service binding name.
@@ -1083,7 +1147,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_module_name` (string, optional) - Function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - Package name.
 - `program_name` (string, optional) - Program name.
 - `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
@@ -1092,7 +1156,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `version` (any, optional) - 
+- `version` (any, optional) -
 
 ---
 
@@ -1289,7 +1353,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `macros_code` (string, optional) - Updated source for class local macros.
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
@@ -1531,6 +1595,72 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
+
+---
+
+<a id="high-level-debugger"></a>
+### High-Level / Debugger
+
+<a id="debuggerdeletebreakpoint-high-level-debugger"></a>
+#### DebuggerDeleteBreakpoint (High-Level / Debugger)
+**Description:** [debugger] Remove one external breakpoint by its id (from DebuggerListBreakpoints), or all of them with all=true. An external breakpoint outlives the session that set it, so clean up when finished.
+
+**Source:** `src/handlers/debugger/high/handleDebuggerDeleteBreakpoint.ts`
+
+**Parameters:**
+- `all` (boolean, optional) - Remove every registered breakpoint. Default false.
+- `breakpoint_id` (string, optional) - Id from DebuggerListBreakpoints.
+
+---
+
+<a id="debuggerlisten-high-level-debugger"></a>
+#### DebuggerListen (High-Level / Debugger)
+**Description:** [debugger] Register a debugger listener and WAIT for one of the user's sessions to hit a breakpoint. This call blocks until a debuggee is caught or the timeout expires. Workflow: set a breakpoint, call this, then trigger the code from SAP GUI or a browser; once it returns, use DebuggerGetStack / DebuggerGetVariables / DebuggerStep, and always finish with DebuggerStop.
+
+**Source:** `src/handlers/debugger/high/handleDebuggerListen.ts`
+
+**Parameters:**
+- `debugging_mode` (string, optional) - Debugging mode: 'user' (default) listens for a user's dialog sessions; 'terminal' listens for this terminal only.
+- `request_user` (string, optional) - User whose sessions to listen for. Defaults to the connection user.
+- `timeout_seconds` (number, optional) - How long to wait for a debuggee (default 120). Keep this below the MCP client timeout.
+
+---
+
+<a id="debuggersetbreakpoint-high-level-debugger"></a>
+#### DebuggerSetBreakpoint (High-Level / Debugger)
+**Description:** [debugger] Register an external breakpoint that DebuggerListen can catch. Required before debugging: a breakpoint set in SAP GUI is a session breakpoint, invisible to ADT, so the listener would never fire. Existing breakpoints are preserved. Follow with DebuggerListen, then trigger the code.
+
+**Source:** `src/handlers/debugger/high/handleDebuggerSetBreakpoint.ts`
+
+**Parameters:**
+- `condition` (string, optional) - Optional ABAP condition, e.g. "gv_index > 10". The breakpoint only stops when it holds.
+- `line` (number, required) - Line number in the source, counting from 1. Put it on an executable statement — a comment or a declaration never runs, so the breakpoint would never fire.
+- `object_name` (string, required) - Object holding the breakpoint, e.g. Z_MY_REPORT.
+- `object_type` (string, required) - Object type: 'PROG/P' (program), 'PROG/I' (include), 'CLAS/OC' (class), 'FUGR/FF' (function module).
+- `parent_name` (string, optional) - Function group, required for function modules (FUGR/FF).
+
+---
+
+<a id="debuggerstep-high-level-debugger"></a>
+#### DebuggerStep (High-Level / Debugger)
+**Description:** [debugger] Advance the attached debuggee one step and return the resulting call stack. Requires an active session from DebuggerListen. Note that "continue" runs until the next breakpoint, which may end the session entirely.
+
+**Source:** `src/handlers/debugger/high/handleDebuggerStep.ts`
+
+**Parameters:**
+- `action` (string, required) - Step action. 'step_into' enters the called routine, 'step_over' runs it to completion, 'step_return' runs to the caller, 'continue' resumes until the next breakpoint.
+
+---
+
+<a id="debuggerstop-high-level-debugger"></a>
+#### DebuggerStop (High-Level / Debugger)
+**Description:** [debugger] Detach the debugger listener and release the debuggee. Call this when finished — an abandoned listener holds the user's session captive and blocks a later Eclipse debugger session for the same user.
+
+**Source:** `src/handlers/debugger/high/handleDebuggerStop.ts`
+
+**Parameters:**
+- `debugging_mode` (string, optional) - Must match the mode used in DebuggerListen. Default 'user'.
+- `request_user` (string, optional) - User the listener was registered for. Defaults to the connection user.
 
 ---
 
@@ -1805,6 +1935,23 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-include"></a>
+### High-Level / Include
+
+<a id="updateinclude-high-level-include"></a>
+#### UpdateInclude (High-Level / Include)
+**Description:** Operation: Update. Subject: Include. Update the source code of an existing ABAP include (PROG/I). This is the correct tool for include names — UpdateProgram targets a different ADT resource and will not write an include. Locks, updates, unlocks, verifies the write by reading the source back, and optionally activates.
+
+**Source:** `src/handlers/include/high/handleUpdateInclude.ts`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate the include after the source update. Default: false.
+- `include_name` (string, required) - Include name (e.g., ZXY_INCLUDE). Must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
@@ -2010,6 +2157,49 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-multisystem"></a>
+### High-Level / Multisystem
+
+<a id="comparetableacrosssystems-high-level-multisystem"></a>
+#### CompareTableAcrossSystems (High-Level / Multisystem)
+**Description:** [read-only] Compare the CONTENTS of a table between this system and another — customizing, not code. Answers "why does this behave differently in QAS?" when the code is identical. Reports rows missing on either side and rows whose fields differ, with the key of each. Key fields are read from the dictionary unless you pass key_fields. MANDT is excluded, since each connection runs in its own client. Use where_clause to scope a large table. Reads only; it never writes to either system.
+
+**Source:** `src/handlers/multisystem/high/handleCompareTableAcrossSystems.ts`
+
+**Parameters:**
+- `ignore_fields` (array, optional) - Fields to exclude from comparison, e.g. change date and changed-by, which differ between systems constantly. Nothing is ignored unless named here.
+- `key_fields` (array, optional) - Override the key used to match rows. Defaults to the table key from the dictionary.
+- `max_differences` (number, optional) - Differing rows detailed in the output, default 200.
+- `max_rows` (number, optional) - Rows read per system, default 1000. If a side hits this cap the result is reported as incomplete rather than as a comparison.
+- `overwrite` (boolean, optional) -
+- `table_name` (string, required) - Table to compare, e.g. T685A.
+- `target_system` (string, required) - Name of the system to compare against, as reported by ListSystems.
+- `to_file` (string, optional) -
+- `where_clause` (string, optional) - Optional filter applied in both systems, without the WHERE keyword, e.g. "KAPPL = 'V'". Needed for any table too large to read whole.
+
+---
+
+<a id="setupsystem-high-level-multisystem"></a>
+#### SetupSystem (High-Level / Multisystem)
+**Description:** Create or update an environment session file (.env) for a target SAP system from its SAP Logon landscape XML entry, probe reachability and TLS, and check Windows Credential Manager.
+
+**Source:** `src/handlers/multisystem/high/handleSetupSystem.ts`
+
+**Parameters:**
+- `allow_untrusted_tls` (boolean, optional) - If true and target TLS certificate is untrusted, write TLS_REJECT_UNAUTHORIZED=0. Default: false.
+- `client` (string, required) - 3-digit SAP client number (e.g. "100").
+- `landscape_path` (string, optional) - Optional path to SAPUILandscape.xml. Defaults to SAP_LANDSCAPE_PATH or standard location.
+- `language` (string, optional) - SAP logon language (e.g. "es", "en"). Default: "es".
+- `name` (string, optional) - Name of the session file to create (e.g. "qas"). Defaults to lowercase SID if unique in the landscape.
+- `overwrite` (boolean, optional) - If true, overwrite existing session file if it exists. Default: false.
+- `require_reachable` (boolean, optional) - If true, fail if the target system cannot be reached over network. Default: false.
+- `service_uuid` (string, required) - Service UUID from SAP Logon landscape (as returned by ListLandscapeSystems).
+- `system_type` (string, optional) - System type: "onprem", "legacy", or "cloud". Default: "onprem".
+- `url` (string, optional) - Optional override for the ADT URL (e.g. "https://sapqas.example.com:44300").
+- `username` (string, required) - SAP username (1 to 12 characters).
+
+---
+
 <a id="high-level-package"></a>
 ### High-Level / Package
 
@@ -2132,7 +2322,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) -
 - `service_binding_name` (string, required) - Service binding name.
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
@@ -2148,7 +2338,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) -
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
@@ -2173,7 +2363,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) -
 
 ---
 
@@ -2186,7 +2376,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI)) - Service binding variant. Determines OData version for publish/unpublish routing.
 - `desired_publication_state` (string, required) - Target publication state.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) -
 - `service_binding_name` (string, required) - Service binding name to update.
 - `service_name` (string, required) - Published service name.
 - `service_version` (string, optional) - Published service version. Optional.
@@ -2428,17 +2618,43 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-transport"></a>
 ### High-Level / Transport
 
+<a id="checktransport-high-level-transport"></a>
+#### CheckTransport (High-Level / Transport)
+**Description:** [read-only] Inspect a transport request before releasing it, and report what would go wrong. Blockers: the request does not exist, holds no objects, has no target system (so it releases and arrives nowhere), or still has open tasks, which SAP refuses to release past. Warning: objects that also sit in another open request, where releasing this one alone moves a partial version. Reads the transport tables; it never modifies or releases anything.
+
+**Source:** `src/handlers/transport/high/handleCheckTransport.ts`
+
+**Parameters:**
+- `max_objects` (number, optional) - Cap on objects read from the request, default 2000. A larger transport is truncated rather than refused, and the result says so.
+- `overwrite` (boolean, optional) -
+- `to_file` (string, optional) -
+- `transport_request` (string, required) - Transport request to inspect, e.g. DEVK900123.
+
+---
+
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
-**Description:** Create a new ABAP transport request in SAP system for development objects.
+**Description:** Create a new ABAP transport request in SAP system for development objects. If target_system is omitted the request is created as LOCAL; the response always reports the target SAP actually assigned, and warns when it differs from the one requested.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
 
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
-- `owner` (string, optional) - Transport owner (optional, defaults to current user)
-- `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
+- `owner` (string, optional) - Transport owner (optional, defaults to the current user). Uppercased automatically.
+- `target_system` (string, optional) - Target system as its bare name, e.g. 'QAS', 'PRD' — no slashes, no client suffix. Must be a transport target defined in STMS (see TMSCSYS). If omitted or empty, the request is created as LOCAL.
 - `transport_type` (string, optional (default: workbench)) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
+
+---
+
+<a id="releasetransport-high-level-transport"></a>
+#### ReleaseTransport (High-Level / Transport)
+**Description:** Release an ABAP transport request or task. Releasing is irreversible — a released request cannot be reopened, only followed by a new one. Tasks must be released before their parent request. The response reports the status read back from SAP after the release job, not merely that the call was accepted.
+
+**Source:** `src/handlers/transport/high/handleReleaseTransport.ts`
+
+**Parameters:**
+- `ignore_locks` (boolean, optional) - Release even when objects in the request are still locked elsewhere. Default false.
+- `transport_request` (string, required) - Transport request or task number (e.g., DEVK900123). Tasks are released individually before the parent request.
 
 ---
 
@@ -2468,9 +2684,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `tests` (array, required) - List of container/test class pairs to execute.
 - `title` (string, optional) - Optional title for the ABAP Unit run.
 
@@ -2579,9 +2795,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `tests` (array, required) - List of container/test class pairs to execute.
 - `title` (string, optional) - Optional title for the ABAP Unit run.
 
@@ -2611,4 +2827,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-10-26*

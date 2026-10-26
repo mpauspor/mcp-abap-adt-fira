@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 159
-- Read-Only: 18
-- High-Level: 80
+- Total tools: 164
+- Read-Only: 22
+- High-Level: 81
 - Low-Level: 61
 
 ## Navigation
@@ -34,6 +34,11 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetIncludesList](#getincludeslist-read-only-include)
   - [Interface](#read-only-interface)
     - [ReadInterface](#readinterface-read-only-interface)
+  - [Multisystem](#read-only-multisystem)
+    - [CompareObjectAcrossSystems](#compareobjectacrosssystems-read-only-multisystem)
+    - [ComparePackageAcrossLandscape](#comparepackageacrosslandscape-read-only-multisystem)
+    - [ComparePackageAcrossSystems](#comparepackageacrosssystems-read-only-multisystem)
+    - [ListSystems](#listsystems-read-only-multisystem)
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
     - [ReadPackage](#readpackage-read-only-package)
@@ -107,6 +112,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
+  - [Include](#high-level-include)
+    - [UpdateInclude](#updateinclude-high-level-include)
   - [Interface](#high-level-interface)
     - [CheckInterface](#checkinterface-high-level-interface)
     - [CreateInterface](#createinterface-high-level-interface)
@@ -248,7 +255,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetObjectVersionSource).
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -417,6 +424,77 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-multisystem"></a>
+### Read-Only / Multisystem
+
+<a id="compareobjectacrosssystems-read-only-multisystem"></a>
+#### CompareObjectAcrossSystems (Read-Only / Multisystem)
+**Description:** [read-only] Compare one repository object's source between the current system and another one (or between two named systems), returning a unified diff. Answers "is this object the same in QAS as in DEV?" and "has it reached PRD yet?". Note that ABAP version numbers are per-system counters and are NOT comparable — this compares source. Use ListSystems for the available names.
+
+**Source:** `src/handlers/multisystem/readonly/handleCompareObjectAcrossSystems.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `context_lines` (number, optional) - Context lines around each change. Default 3.
+- `include_diff` (boolean, optional) - Include the unified diff text. Default true. Set false for a verdict only, when scanning many objects.
+- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_type` (string, required) - Object type code: CLAS/OC, INTF/OI, PROG/P, PROG/I (include), DDLS/DF, TABL, STRU, BDEF, SRVD, DDLX, FUGR/FF.
+- `parent_name` (string, optional) - Function group, required for function modules (FUGR/FF).
+- `source_system` (string, optional) - Optional. Name of the system to compare FROM. Defaults to the system this server is connected to.
+- `target_system` (string, required) - Name of the system to compare against (from ListSystems), e.g. qs4.
+
+---
+
+<a id="comparepackageacrosslandscape-read-only-multisystem"></a>
+#### ComparePackageAcrossLandscape (Read-Only / Multisystem)
+**Description:** [read-only] Walk a package across an ordered promotion chain (e.g. QAS then PRD) in ONE call and report how far each object has travelled from the current system. Use instead of running CompareObjectAcrossSystems per system and cross-referencing by hand. Flags out-of-band changes, where a downstream system matches while an upstream one does not. Function groups are expanded into modules and includes; use object_types to narrow a large package.
+
+**Source:** `src/handlers/multisystem/readonly/handleComparePackageAcrossLandscape.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `concurrency` (number, optional) -
+- `include_subpackages` (boolean, optional) - Include sub-packages. Default false.
+- `max_objects` (number, optional) -
+- `object_types` (array, optional) - Optional filter on the type as the PACKAGE reports it, e.g. ["CLAS/OC","PROG/P","TABL/DS","FUGR/F"]. Strongly recommended on large packages.
+- `only_pending` (boolean, optional) - Return only objects that have NOT reached the end of the chain. Default true.
+- `package_name` (string, required) - ABAP package, e.g. ZSD.
+- `systems` (array, required) - Target systems IN PROMOTION ORDER, e.g. ["qs4","ps4"]. Names come from ListSystems. The current system is always the source.
+
+---
+
+<a id="comparepackageacrosssystems-read-only-multisystem"></a>
+#### ComparePackageAcrossSystems (Read-Only / Multisystem)
+**Description:** [read-only] Compare every source object in a package between the current system and another one, reporting which objects are identical, which differ, and which exist in only one system. This is the custom-code drift survey across a landscape (DEV vs QAS vs PRD). Function groups are expanded into their function modules and includes. Diffs are omitted by default — use CompareObjectAcrossSystems on the objects that differ.
+
+**Source:** `src/handlers/multisystem/readonly/handleComparePackageAcrossSystems.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `include_subpackages` (boolean, optional) - Include sub-packages. Default false.
+- `max_objects` (number, optional) -
+- `only_differences` (boolean, optional) - Return only the objects that are not identical. Default true — the identical ones are rarely what you are looking for.
+- `package_name` (string, required) - ABAP package, e.g. ZMY_PACKAGE.
+- `target_system` (string, required) - Name of the system to compare against (from ListSystems), e.g. qs4.
+
+---
+
+<a id="listsystems-read-only-multisystem"></a>
+#### ListSystems (Read-Only / Multisystem)
+**Description:** [read-only] List the SAP systems this server can reach for cross-system comparison, plus the system it is itself connected to. Use the returned names with CompareObjectAcrossSystems and ComparePackageAcrossSystems. Reports connection metadata only — never credentials.
+
+**Source:** `src/handlers/multisystem/readonly/handleListSystems.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- None
 
 ---
 
@@ -801,7 +879,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetClassVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -841,7 +919,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetDdlVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -881,7 +959,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetFunctionModuleVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -922,7 +1000,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetInterfaceVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -962,7 +1040,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to GetProgramVersionSource).
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1019,7 +1097,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `length` (number, optional) - Length for typed artifacts.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
@@ -1054,7 +1132,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `function_module_name` (string, optional) - ABAP function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
 - `service_binding_name` (string, optional) - Service binding name.
@@ -1084,7 +1162,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `function_module_name` (string, optional) - Function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - Package name.
 - `program_name` (string, optional) - Program name.
 - `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
@@ -1093,7 +1171,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `version` (any, optional) - 
+- `version` (any, optional) -
 
 ---
 
@@ -1131,7 +1209,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `macros_code` (string, optional) - Updated source for class local macros.
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) -
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
@@ -1440,6 +1518,25 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="high-level-include"></a>
+### High-Level / Include
+
+<a id="updateinclude-high-level-include"></a>
+#### UpdateInclude (High-Level / Include)
+**Description:** Operation: Update. Subject: Include. Update the source code of an existing ABAP include (PROG/I). This is the correct tool for include names — UpdateProgram targets a different ADT resource and will not write an include. Locks, updates, unlocks, verifies the write by reading the source back, and optionally activates.
+
+**Source:** `src/handlers/include/high/handleUpdateInclude.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate the include after the source update. Default: false.
+- `include_name` (string, required) - Include name (e.g., ZXY_INCLUDE). Must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
 <a id="high-level-interface"></a>
 ### High-Level / Interface
 
@@ -1657,9 +1754,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `tests` (array, required) - List of container/test class pairs to execute.
 - `title` (string, optional) - Optional title for the ABAP Unit run.
 
@@ -1786,9 +1883,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `tests` (array, required) - List of container/test class pairs to execute.
 - `title` (string, optional) - Optional title for the ABAP Unit run.
 
@@ -1983,9 +2080,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
+- `duration` (object, optional) -
+- `risk_level` (object, optional) -
+- `scope` (object, optional) -
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `tests` (array, required) - List of container/test class pairs to execute.
@@ -2078,7 +2175,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="activateobjectlow-low-level-common"></a>
 #### ActivateObjectLow (Low-Level / Common)
-**Description:** [low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type.
+**Description:** [low-level] Activate one or multiple ABAP repository objects. URI is derived from name and type; pass an explicit uri to override.
 
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
 
@@ -2836,4 +2933,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-10-26*

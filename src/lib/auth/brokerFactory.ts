@@ -30,10 +30,46 @@ import type {
   ITokenProvider,
   ITokenResult,
 } from '@mcp-abap-adt/interfaces';
+import {
+  planCredentialSeed,
+  resolveBasicPassword,
+} from '../landscape/passwordResolver';
 import { detectStoreType } from '../stores';
 import { getPlatformPaths } from '../stores/platformPaths';
 import type { IAuthBrokerFactory } from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
+
+/**
+ * Read a session file's keys, by the same rules the rest of this file uses: a
+ * `#` starts a comment only at the beginning of a line, and surrounding quotes
+ * are stripped. Values are never logged — the caller asks only whether a
+ * password is present and which credential target to read.
+ */
+function parseEnvFileForCredentials(
+  envFilePath: string,
+): Record<string, string> {
+  if (!fs.existsSync(envFilePath)) {
+    throw new Error(`.env file not found: ${envFilePath}`);
+  }
+
+  const envVars: Record<string, string> = {};
+  for (const line of fs.readFileSync(envFilePath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex === -1) continue;
+
+    const key = trimmed.substring(0, eqIndex).trim();
+    const value = trimmed
+      .substring(eqIndex + 1)
+      .trim()
+      .replace(/^["']+|["']+$/g, '')
+      .trim();
+    if (key) envVars[key] = value;
+  }
+  return envVars;
+}
 
 /**
  * Default implementation of IAuthBrokerFactory
@@ -41,6 +77,16 @@ import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
 export class AuthBrokerFactory implements IAuthBrokerFactory {
   // Map of brokers: key = destination name (or 'default' for default broker)
   private authBrokers = new Map<string, AuthBroker>();
+
+  /**
+   * Why the default broker could not be created, if it could not.
+   *
+   * Initialization deliberately does not throw, so that a server with no
+   * connection parameters still starts for inspection. Without this the reason
+   * was only visible in debug logs, and the next tool call reported a mock
+   * connection's missing client instead (T-013).
+   */
+  public lastDefaultBrokerError?: string;
 
   // Shared stores - one per store type and directory
   // Key: `${storeType}::${serviceKeysDir}::${sessionsDir}::${unsafe}`
@@ -272,11 +318,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
           useEnvFileStore: defaultBrokerConfig.useEnvFileStore,
         });
       } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
         logger?.debug('Failed to initialize default broker', {
           type: 'DEFAULT_BROKER_INIT_FAILED',
-          error: error instanceof Error ? error.message : String(error),
+          error: reason,
         });
-        // Don't throw - server can still work without default broker
+        // Don't throw - server can still work without default broker. Keep the
+        // reason so the launcher can say it out loud (T-013).
+        this.lastDefaultBrokerError = reason;
       }
     } else {
       logger?.debug('Default broker not created (no conditions met)', {
@@ -641,12 +690,59 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     // Create EnvFileSessionStore that reads from specified .env file
     const sessionStore = new EnvFileSessionStore(envFilePath, storeLogger);
 
-    // Get auth type from .env file to determine if we need token provider
-    const authType = sessionStore.getAuthType();
+    // A session file written by SetupSystem carries SAP_CREDENTIAL_TARGET and
+    // no SAP_PASSWORD (D-007). EnvFileSessionStore reads the file itself and
+    // returns null for basic auth when the password is absent, so `getAuthType`
+    // answers null, this method used to throw, the caller swallowed it, and the
+    // server fell back to the mock connection — which then failed far away with
+    // "Basic authentication requires SAP_CLIENT to be provided" (T-013).
+    //
+    // So resolve the credential here and seed the store with a complete config.
+    // `setConnectionConfig` keeps it in `inMemoryUpdates`, which
+    // `getConnectionConfig` consults first, and only a JWT is ever written back
+    // to the file: the password stays in memory, never on disk and never in
+    // `process.env`.
+    const envVars = parseEnvFileForCredentials(envFilePath);
+    const { needsCredentialStore } = planCredentialSeed(envVars);
+
+    let seededFromCredentialStore = false;
+    if (needsCredentialStore) {
+      // Throws with the cmdkey command to run when the credential is missing,
+      // and refuses a credential whose stored user is not SAP_USERNAME.
+      const password = resolveBasicPassword(envVars);
+      if (!password) {
+        throw new Error(
+          `${envFilePath} declares SAP_CREDENTIAL_TARGET=${envVars.SAP_CREDENTIAL_TARGET} but no password could be resolved from it.`,
+        );
+      }
+      if (!envVars.SAP_USERNAME?.trim()) {
+        throw new Error(`${envFilePath} is missing SAP_USERNAME.`);
+      }
+      await sessionStore.setConnectionConfig(brokerKey, {
+        serviceUrl: envVars.SAP_URL,
+        sapClient: envVars.SAP_CLIENT,
+        authType: 'basic',
+        username: envVars.SAP_USERNAME,
+        password,
+      } as any);
+      seededFromCredentialStore = true;
+      logger?.debug('Seeded env file store from the credential store', {
+        type: 'ENV_FILE_STORE_CREDENTIAL_SEEDED',
+        brokerKey,
+        envFilePath,
+        credentialTarget: envVars.SAP_CREDENTIAL_TARGET,
+      });
+    }
+
+    // Get auth type from .env file to determine if we need token provider.
+    // A seeded store answers basic even though the file alone does not.
+    const authType = seededFromCredentialStore
+      ? 'basic'
+      : sessionStore.getAuthType();
 
     if (!authType) {
       throw new Error(
-        `Unable to determine auth type from .env file: ${envFilePath}`,
+        `Unable to determine auth type from ${envFilePath}. For basic auth the file needs SAP_USERNAME plus either SAP_PASSWORD or SAP_CREDENTIAL_TARGET; for JWT it needs SAP_JWT_TOKEN.`,
       );
     }
 
@@ -757,13 +853,14 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     connectionConfig.authType = authType;
 
     if (authType === 'basic') {
-      if (!envVars.SAP_USERNAME || !envVars.SAP_PASSWORD) {
+      const password = resolveBasicPassword(envVars);
+      if (!envVars.SAP_USERNAME || !password) {
         throw new Error(
           '.env file missing SAP_USERNAME or SAP_PASSWORD for basic auth',
         );
       }
       connectionConfig.username = envVars.SAP_USERNAME;
-      connectionConfig.password = envVars.SAP_PASSWORD;
+      connectionConfig.password = password;
     } else if (authType === 'jwt') {
       if (!envVars.SAP_JWT_TOKEN) {
         throw new Error('.env file missing SAP_JWT_TOKEN for JWT auth');

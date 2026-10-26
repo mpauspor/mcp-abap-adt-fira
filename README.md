@@ -104,6 +104,17 @@ SAP executes the ACTIVE load. After an update without activation, the run
 returned the old version's output as though it were current. A pre-flight now
 compares the active and inactive sources and refuses with an explanation.
 
+### Version content URIs were unvalidated
+
+The URI was appended to the SAP origin, so a crafted value (for example
+`@other.host/x`) sent the basic-auth header and session cookies to another host.
+Version content URIs passed to version source and diff tools are now validated to
+be relative paths starting with `/sap/bc/adt/` before dispatch, rejecting path
+traversal, external URLs, and malformed inputs. Responses are also guarded against
+HTML logon or error pages (e.g. from expired sessions or invalid endpoints). When
+an object has no version history or version source, standardized 404/406 messages
+are returned instead of raw exception codes.
+
 ---
 
 ## New capabilities
@@ -128,6 +139,66 @@ transport chain, which is precisely what you want surfaced.
 Function groups are expanded into their function modules and includes. Without
 that a typical custom package reports almost nothing, since a `FUGR` has no
 source of its own.
+
+### Adding a system from SAP Logon
+
+Instead of crafting `.env` files manually, two tools let you discover and
+configure systems straight from your SAP Logon landscape:
+
+- `ListLandscapeSystems` reads `SAPUILandscape.xml` (defaulting to
+  `%APPDATA%\SAP\Common\SAPUILandscape.xml`, overridable via `SAP_LANDSCAPE_PATH`
+  or tool parameter). It parses folder structures, resolves message servers and
+  routers, derives standard HTTPS ports (`44300 + instance`), and can probe
+  network/HTTP reachability.
+- `SetupSystem` writes a verified `<name>.env` file to your sessions folder
+  (`%USERPROFILE%\Documents\mcp-abap-adt\sessions\`). It probes the target
+  system, verifies reachability, configures connection parameters, and sets up
+  `SAP_CREDENTIAL_TARGET=mcp-abap-adt:<name>`.
+
+#### Storing passwords with Windows Credential Manager
+
+Passwords are **never written to `.env` files**. Store the password in the
+Windows Credential Manager using the standard `cmdkey` utility:
+
+```cmd
+cmdkey /generic:mcp-abap-adt:<name> /user:<USERNAME> /pass
+```
+
+The prompt reads the password without echoing it to the terminal. When the
+server starts with `--env=<name>`, the launcher retrieves the password
+directly from the credential vault via the Windows `CredReadW` API.
+
+#### Web Dispatchers and Routers
+
+If the SAP Logon entry points to an application server behind a router or
+message server, ADT HTTP/HTTPS traffic often routes through a SAP Web Dispatcher
+or specific reverse proxy. Pass `url` explicitly to `SetupSystem` (e.g.
+`url: "https://webdispatcher.corp:44300"`) to override the derived URL.
+
+#### Reachability probe
+
+`SetupSystem` probes the endpoint (`/sap/bc/adt/discovery`) to check network and
+HTTP reachability before writing the file. The probe verifies connectivity and
+ICF handler availability — it does **not** check credentials (unauthenticated
+requests under `/sap/bc/adt` return the SAP HTML logon page). If the system is
+currently unreachable (e.g. VPN off), pass `require_reachable: false` to write
+the file anyway.
+
+### TLS certificate verification
+
+TLS certificate verification is **enabled by default** (D-009).
+
+- **Windows CA Trust:** The server automatically loads certificates from the
+  Windows Root Certificate Store alongside Node's bundled CAs. Corporate and
+  internal CAs installed on your machine are trusted out of the box.
+- **Custom CAs:** If using a custom CA file, point `NODE_EXTRA_CA_CERTS` to your
+  PEM certificate bundle.
+- **Self-signed certificates:** If a development system uses an untrusted or
+  self-signed certificate, pass `allow_untrusted_tls: true` to `SetupSystem`.
+  This writes `TLS_REJECT_UNAUTHORIZED=0` into the session file.
+- **Process-wide setting:** In Node.js, TLS verification is process-wide.
+  Setting `TLS_REJECT_UNAUTHORIZED=0` disables certificate verification for
+  **every system** the MCP server connects to during that run.
 
 ### Customizing across systems, not just code
 

@@ -373,6 +373,10 @@ import {
   TOOL_DEFINITION as CompareTableAcrossSystems_Tool,
   handleCompareTableAcrossSystems,
 } from '../../../handlers/multisystem/high/handleCompareTableAcrossSystems';
+import {
+  handleSetupSystem,
+  TOOL_DEFINITION as SetupSystem_Tool,
+} from '../../../handlers/multisystem/high/handleSetupSystem';
 // Import high-level handlers
 // Import TOOL_DEFINITION from handlers
 import {
@@ -1119,6 +1123,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: CompareTableAcrossSystems_Tool,
         handler: withContext(handleCompareTableAcrossSystems),
+      },
+      {
+        toolDefinition: SetupSystem_Tool,
+        handler: withContext(handleSetupSystem),
       },
       // abapGit (ADT-integrated)
       {

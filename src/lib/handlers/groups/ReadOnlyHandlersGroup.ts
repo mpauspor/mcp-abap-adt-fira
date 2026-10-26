@@ -127,6 +127,10 @@ import {
   handleComparePackageAcrossSystems,
 } from '../../../handlers/multisystem/readonly/handleComparePackageAcrossSystems';
 import {
+  handleListLandscapeSystems,
+  TOOL_DEFINITION as ListLandscapeSystems_Tool,
+} from '../../../handlers/multisystem/readonly/handleListLandscapeSystems';
+import {
   handleListSystems,
   TOOL_DEFINITION as ListSystems_Tool,
 } from '../../../handlers/multisystem/readonly/handleListSystems';
@@ -239,7 +243,11 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         toolDefinition: AbapGitListRepos_Tool,
         handler: (args: any) => handleAbapGitListRepos(this.context, args),
       },
-      // Cross-system comparison
+      // Cross-system comparison and landscape
+      {
+        toolDefinition: ListLandscapeSystems_Tool,
+        handler: (args: any) => handleListLandscapeSystems(this.context, args),
+      },
       {
         toolDefinition: ListSystems_Tool,
         handler: (args: any) => handleListSystems(this.context, args),

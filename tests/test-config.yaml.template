@@ -87,7 +87,7 @@ lock_config:
 
 environment:
   # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
-  # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
+  # Contains SAP_URL, SAP_USERNAME, SAP_CLIENT, SAP_AUTH_TYPE, and SAP_CREDENTIAL_TARGET (preferred) or SAP_PASSWORD.
   env: ""                                    # ← CHANGE: session file name (e.g., "e19.env", "mdd.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
@@ -2235,6 +2235,77 @@ get_structures_list_readonly:
         # Created out-of-band (adt-clients cannot create `extend type` objects);
         # leave empty to skip the append assertion on systems without it.
         expected_append: "ZOK_S_APPEND"
+
+# Object version history (read-only) — list, source, diff
+get_object_versions_readonly:
+  # Objects that exist on the target system and have transported versions.
+  # Fill in real names (# ← CHANGE); an empty object_name skips that case.
+  missing_object_name: "ZZ_T002_NO_SUCH_OBJECT"   # must NOT exist
+  test_cases:
+    - name: "class"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      params:
+        object_type: "class"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "program"
+      enabled: true
+      available_in: ["onprem", "legacy"]
+      params:
+        object_type: "program"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "interface"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      params:
+        object_type: "interface"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "function_module"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      params:
+        object_type: "function_module"
+        object_name: ""            # ← CHANGE
+        function_group_name: ""    # ← CHANGE
+        min_versions: 1
+    - name: "table"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        object_type: "table"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "structure"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        object_type: "structure"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "ddl"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      params:
+        object_type: "ddl"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "behavior_definition"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        object_type: "behavior_definition"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
+    - name: "metadata_extension"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      params:
+        object_type: "metadata_extension"
+        object_name: ""            # ← CHANGE
+        min_versions: 1
 
 # FunctionInclude high-level lifecycle (create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.

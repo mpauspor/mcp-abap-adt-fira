@@ -18,6 +18,8 @@ import {
   return_response,
 } from '../../../lib/utils';
 import {
+  assertNotHtmlSource,
+  assertVersionContentUri,
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
 } from './resolveVersionedObject';
@@ -43,6 +45,9 @@ export async function buildVersionDiff(
     obj.getVersionSource(contentUriFrom),
     obj.getVersionSource(contentUriTo),
   ]);
+
+  assertNotHtmlSource(rawFrom, 'content_uri_from', contentUriFrom);
+  assertNotHtmlSource(rawTo, 'content_uri_to', contentUriTo);
 
   const notes: string[] = [];
   if (rawFrom == null) {
@@ -121,6 +126,8 @@ export async function handleGetObjectVersionDiff(
         ),
       );
     }
+    assertVersionContentUri(content_uri_from, 'content_uri_from');
+    assertVersionContentUri(content_uri_to, 'content_uri_to');
     if (!VERSIONED_OBJECT_TYPES.includes(object_type as any)) {
       return return_error(
         new Error(
@@ -164,7 +171,7 @@ export async function handleGetObjectVersionDiff(
       if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
         return return_error(
           new Error(
-            `Version diff is not supported for object_type '${object_type}'.`,
+            'No version source for one of the two content URIs (SAP answered 404/406).',
           ),
         );
       }

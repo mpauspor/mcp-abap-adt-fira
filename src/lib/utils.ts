@@ -16,6 +16,7 @@ import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
 } from './connectionEvents';
+import { resolveBasicPassword } from './landscape/passwordResolver';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 
@@ -281,6 +282,38 @@ export function extractAdtErrorMessage(
   return fallback;
 }
 
+export const TLS_CERT_ERROR_CODES = [
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+];
+
+export const TLS_CERT_HINT =
+  "The SAP system's TLS certificate is not trusted. If your company's CA issued it, make that CA trusted (Windows certificate store, or NODE_EXTRA_CA_CERTS). If the system uses a self-signed certificate on purpose, set TLS_REJECT_UNAUTHORIZED=0 in its session file — that turns verification off for every system this server connects to.";
+
+function hasTlsCertError(err: any): boolean {
+  if (typeof err === 'string') {
+    return TLS_CERT_ERROR_CODES.some((c) => err.includes(c));
+  }
+  let curr = err;
+  const visited = new Set();
+  while (curr && typeof curr === 'object' && !visited.has(curr)) {
+    visited.add(curr);
+    const code = curr.code;
+    const msg = typeof curr.message === 'string' ? curr.message : '';
+    for (const certCode of TLS_CERT_ERROR_CODES) {
+      if (code === certCode || msg.includes(certCode)) {
+        return true;
+      }
+    }
+    curr = curr.cause;
+  }
+  return false;
+}
+
 export function return_error(error: any) {
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object
@@ -426,6 +459,12 @@ export function return_error(error: any) {
   // errors are unaffected: the SDK raises those before our code runs and never
   // reaches return_error.
   errorText = errorText.replace(/^(?:McpError: |MCP error -?\d+: )+/, '');
+
+  if (hasTlsCertError(error) && !errorText.includes(TLS_CERT_HINT)) {
+    const separator =
+      errorText.endsWith(' ') || errorText.endsWith('\n') ? '' : ' ';
+    errorText = `${errorText}${separator}${TLS_CERT_HINT}`;
+  }
 
   return {
     isError: true,
@@ -1993,7 +2032,7 @@ export function getConfig(): SapConfig {
   } else {
     // basic and rfc both require username/password
     const username = process.env.SAP_USERNAME;
-    const password = process.env.SAP_PASSWORD;
+    const password = resolveBasicPassword(process.env);
     if (!username || !password) {
       throw new Error(
         `Missing SAP_USERNAME or SAP_PASSWORD for ${authType} authentication`,

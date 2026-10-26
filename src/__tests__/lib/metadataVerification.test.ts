@@ -22,7 +22,7 @@ const ok = (payload: Record<string, unknown>): Result => ({
 });
 
 /** A writer that claims success, as the unverified tools always did. */
-const claimsSuccess = jest.fn(async () => ok({ success: true }));
+const claimsSuccess = jest.fn(async (..._args: any[]) => ok({ success: true }));
 
 const context = { connection: {}, logger: undefined } as any;
 

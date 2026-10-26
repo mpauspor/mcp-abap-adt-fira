@@ -483,7 +483,7 @@ function loadObjectVersionTools() {
 
     tools.push({
       name: `Get${display}Versions`,
-      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
+      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque contentUri (pass it as content_uri to Get${display}VersionSource).`,
       inputSchema: { properties: versionsProps, required: versionsRequired },
       inputSchemaRef: null,
       availableIn,
@@ -960,36 +960,45 @@ function main() {
     process.exit(1);
   }
 
+  function cleanTrailingWhitespace(text) {
+    return text
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .join('\n');
+  }
+
   console.log(`✅ Found ${tools.length} tools`);
   const markdownAll = generateMarkdown(tools);
-  fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
+  fs.writeFileSync(OUTPUT_PATHS.all, cleanTrailingWhitespace(markdownAll), 'utf8');
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
-    generateLevelMarkdown(tools, 'readonly'),
+    cleanTrailingWhitespace(generateLevelMarkdown(tools, 'readonly')),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.high,
-    generateLevelMarkdown(tools, 'high'),
+    cleanTrailingWhitespace(generateLevelMarkdown(tools, 'high')),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.low,
-    generateLevelMarkdown(tools, 'low'),
+    cleanTrailingWhitespace(generateLevelMarkdown(tools, 'low')),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.compact,
-    generateCompactMarkdown(tools),
+    cleanTrailingWhitespace(generateCompactMarkdown(tools)),
     'utf8',
   );
   fs.writeFileSync(
     OUTPUT_PATHS.legacy,
-    generateEnvironmentMarkdown(
-      tools,
-      'legacy',
-      'Legacy System',
-      'Tools available on legacy SAP systems (BASIS < 7.50).\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
+    cleanTrailingWhitespace(
+      generateEnvironmentMarkdown(
+        tools,
+        'legacy',
+        'Legacy System',
+        'Tools available on legacy SAP systems (BASIS < 7.50).\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
+      ),
     ),
     'utf8',
   );
